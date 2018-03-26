@@ -56,6 +56,7 @@
 * Sender plugins gather events and send to daemon.
 * Daemon send events to plugins base on their filter settings.
 * Parser plugins do the heavy work and generate synthetic event if needed.
+* Daemon send all synthetic events to receiver plugins via IP multicast socket.
 
 ## Plugin conf
 
