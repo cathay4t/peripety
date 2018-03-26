@@ -6,6 +6,8 @@ sudo modprobe dm-multipath
 sudo systemctl restart multipathd
 sudo multipath -l
 echo offline | sudo tee /sys/block/sdp/device/state
+sleep 30
+echo running | sudo tee /sys/block/sdp/device/state
 if [ "CHK$1" != "CHK" ];then
     exit
 fi

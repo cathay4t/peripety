@@ -1,0 +1,6 @@
+[package]
+name = "peripetyd"
+version = "0.1.0"
+authors = ["Gris Ge <cnfourt@gmail.com>"]
+
+[dependencies]

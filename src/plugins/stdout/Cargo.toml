@@ -1,0 +1,7 @@
+[package]
+name = "stdout"
+version = "0.1.0"
+authors = ["Gris Ge <cnfourt@gmail.com>"]
+
+[dependencies]
+net2 = "0.2"

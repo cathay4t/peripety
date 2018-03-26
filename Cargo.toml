@@ -1,0 +1,6 @@
+[workspace]
+members = [
+    "src/peripetyd",
+    "src/plugins/kmsg",
+    "src/plugins/stdout",
+]
