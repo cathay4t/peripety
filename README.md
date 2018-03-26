@@ -70,7 +70,8 @@ type = "sender"
 
 [mpath]
 type = "parser"
-filer_type = "dm"
+filer_system = "dm"     # Only send dm event to this plugin.
+filer_type = "raw"      # Only send raw event to this plugin.
 
 [jounal]
 type = "receiver"
