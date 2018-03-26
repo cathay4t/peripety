@@ -13,14 +13,16 @@
 ## Event format
 ```json
 {
-    "hostname":     "gris-laptop.example.com"
-    "severity":     "info|warn|error",
-    "system":       "scsi|lvm|multipath|block|fs|mdraid",
-    "event_id":     "uuid_of_event",
-    "dev_wwid":     "wwid_of_device_related",
-    "dev_name":     "device_name"
-    "msg":          "human_readable_message",
-    # Type specfic settings.
+    "hostname":             "gris-laptop.example.com",
+    "severity":             "info|warn|error",
+    "system":               "scsi|lvm|multipath|block|fs|mdraid",
+    "event_id":             "uuid_of_event",
+    "dev_wwid":             "wwid_of_device_related",
+    "dev_name":             "device_name",
+    "msg":                  "human_readable_message",
+    "plugin_specifc_1":     "value_1",
+    "plugin_specifc_2":     "value_2",
+    "plugin_specifc_3":     "value_3"
 }
 ```
 
@@ -59,15 +61,15 @@
 
 ```toml
 [main]
-receiver_multicast_ip = 127.0.0.1
+receiver_multicast_ip = "127.0.0.1"
 
 [kmsg]
-type = sender
+type = "sender"
 
 [mpath]
-type = parser
-filer_type = dm
+type = "parser"
+filer_type = "dm"
 
 [jounal]
-type = receiver
+type = "receiver"
 ```
