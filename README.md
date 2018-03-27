@@ -22,9 +22,11 @@
     "dev_wwid":             "wwid_of_device_related",
     "dev_name":             "device_name",
     "msg":                  "human_readable_message",
-    "plugin_specifc_1":     "value_1",
-    "plugin_specifc_2":     "value_2",
-    "plugin_specifc_3":     "value_3"
+    "extentions":           {
+        "plugin_specifc_1":     "value_1",
+        "plugin_specifc_2":     "value_2",
+        "plugin_specifc_3":     "value_3"
+    }
 }
 ```
 

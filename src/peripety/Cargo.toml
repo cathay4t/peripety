@@ -1,0 +1,6 @@
+[package]
+name = "peripety"
+version = "0.1.0"
+authors = ["Gris Ge <fge@redhat.com>"]
+
+[dependencies]
