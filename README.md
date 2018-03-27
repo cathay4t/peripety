@@ -33,17 +33,20 @@
 ## Plugin types
 * **Sender**
 
-  Generate raw or synthetic events.
-  For raw event, the `dev_id` is missing, but `dev_name` is mandatory for
-  Parser to do look up.
-  For synthetic event, the `dev_id` is valid and consistent.
+  Generate raw event.
+  For raw event, the `dev_id` might be missing, but `dev_name` might be not
+  be human friendly(for example, SCSI disk event might have "4:0:0:1").
+  All events will send to parser to generate synthetic event.
   Example would be `udev` and `kmsg` plugins.
 
 * **Parser**
 
   Parser both raw and synthetic events, then generate synthetic events to
-  receivers. Allow filter on incoming events.
-  Example plugins would be `dm`, `scsi`, `block`, `fs`, `mdraid`.
+  receivers.
+  For synthetic event, the `dev_id` is valid and consistent, `dev_name`
+  is human friendly.
+  Allow filtering on incoming events.
+  Example plugins would be `multipath`, `scsi`, `block`, `fs`, `mdraid`.
 
 * **Receiver**
 
