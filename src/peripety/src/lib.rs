@@ -17,7 +17,7 @@ pub enum LogSeverity {
 #[derive(Debug, Clone, PartialEq)]
 pub enum StorageSubSystem {
     Scsi,
-    Lvm,
+    LvmThin,
     Multipath,
     Block,
     Fs,

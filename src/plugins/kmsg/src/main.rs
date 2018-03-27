@@ -79,49 +79,37 @@ fn gen_kmsg(e: &str) -> Option<Kmsg> {
     ).unwrap();
     for line in e.lines() {
         if !parsed {
-            match re_line.captures(line) {
-                Some(cap) => {
-                    kmsg.msg =
-                        cap.name("msg").map_or("", |m| m.as_str()).to_string();
-                    let entries: Vec<&str> = cap.name("prefix")
-                        .map_or("", |m| m.as_str())
-                        .split(",")
-                        .collect();
-                    if entries.len() >= 4 {
-                        let prefix: u8 = entries[0].parse().unwrap();
-                        kmsg.severity = prefix & 0b111;
-                        // 3 lowest bits of syslog prefix number
-                        kmsg.facility = (prefix & 0b11111000) >> 3;
-                        kmsg.sequence = entries[1].parse().unwrap();
-                        kmsg.montonic_microseconds =
-                            entries[2].parse().unwrap();
-                        kmsg.flag = entries[3].parse().unwrap();
-                    }
-                    parsed = true;
-                    continue;
+            if let Some(cap) = re_line.captures(line) {
+                kmsg.msg =
+                    cap.name("msg").map_or("", |m| m.as_str()).to_string();
+                let entries: Vec<&str> = cap.name("prefix")
+                    .map_or("", |m| m.as_str())
+                    .split(',')
+                    .collect();
+                if entries.len() >= 4 {
+                    let prefix: u8 = entries[0].parse().unwrap();
+                    kmsg.severity = prefix & 0b111;
+                    // 3 lowest bits of syslog prefix number
+                    kmsg.facility = (prefix & 0b1111_1000) >> 3;
+                    kmsg.sequence = entries[1].parse().unwrap();
+                    kmsg.montonic_microseconds = entries[2].parse().unwrap();
+                    kmsg.flag = entries[3].parse().unwrap();
                 }
-                None => (),
+                parsed = true;
+                continue;
             }
         }
-        match re_subline.captures(line) {
-            Some(cap) => {
-                kmsg.dict.insert(
-                    cap.name("key").map_or("", |m| m.as_str()).to_string(),
-                    cap.name("value").map_or("", |m| m.as_str()).to_string(),
-                );
-            }
-            None => (),
+        if let Some(cap) = re_subline.captures(line) {
+            kmsg.dict.insert(
+                cap.name("key").map_or("", |m| m.as_str()).to_string(),
+                cap.name("value").map_or("", |m| m.as_str()).to_string(),
+            );
         }
     }
-    match parsed {
-        true => {
-            if kmsg.facility == SyslogFacility::Kernel as u8 {
-                Some(kmsg)
-            } else {
-                None
-            }
-        }
-        false => None,
+    if parsed && kmsg.facility == SyslogFacility::Kernel as u8 {
+        Some(kmsg)
+    } else {
+        None
     }
 }
 
@@ -130,28 +118,67 @@ fn kmsg_to_storage_event(kmsg: Kmsg) -> Option<StorageEvent> {
     // We only set severity, sub_system, dev_name, msg.
     let mut se: StorageEvent = Default::default();
     match kmsg.dict.get("SUBSYSTEM") {
-        Some(sub) => {
-            match sub.as_ref() {
-                "scsi" => {
-                    se.sub_system = StorageSubSystem::Scsi;
-                    match kmsg.dict.get("DEVICE") {
-                        Some(dev) => {
-                            if dev.starts_with("+scsi:") {
-                                se.dev_name =
-                                    dev.trim_left_matches("+scsi:").to_string();
-                            }
+        Some(sub) => match sub.as_ref() {
+            "scsi" => {
+                se.dev_name = kmsg.dict
+                    .get("DEVICE")
+                    .and_then(|dev| {
+                        if dev.starts_with("+scsi:") {
+                            se.sub_system = StorageSubSystem::Scsi;
+                            Some(dev.trim_left_matches("+scsi:"))
+                        } else {
+                            None
                         }
-                        None => return None,
-                        // TODO(Gris Ge) Does SCSI all have DEVICE?
-                    };
-                }
-                _ => return None,
-            };
-        }
+                    })
+                    .unwrap_or("")
+                    .to_string();
+            }
+            _ => (),
+        },
         None => {
             // Do the hard work on finding sub system.
+            if kmsg.msg.starts_with("device-mapper: thin:") {
+                let re =
+                    Regex::new(r"^device-mapper: thin: (\d+:\d+):").unwrap();
+                if let Some(cap) = re.captures(&kmsg.msg) {
+                    se.dev_name = cap.get(1)
+                        .and_then(|m| {
+                            se.sub_system = StorageSubSystem::LvmThin;
+                            Some(m.as_str())
+                        })
+                        .unwrap_or("")
+                        .to_string()
+                }
+            } else if kmsg.msg.starts_with("device-mapper: multipath:") {
+                let re = Regex::new(
+                    r"(?x)
+                    ^device-mapper:\s
+                    multipath:\s
+                    ((?:Failing)|(?:Reinstating))\s
+                    path\s
+                    (\d+:\d+).$
+                    ",
+                ).unwrap();
+                if let Some(cap) = re.captures(&kmsg.msg) {
+                    se.dev_name = cap.get(2)
+                        .and_then(|m| Some(m.as_str()))
+                        .unwrap_or("")
+                        .to_string();
+                    se.sub_system = StorageSubSystem::Multipath;
+                    se.event_type = cap.get(1)
+                        .and_then(|m| Some(m.as_str()))
+                        .and_then(|a| match a {
+                            "Failing" => Some("DM_MPATH_PATH_FAILED"),
+                            "Reinstating" => Some("DM_MPATH_PATH_REINSTATED"),
+                            _ => None,
+                        })
+                        .unwrap_or("")
+                        .to_string();
+                }
+            }
         }
     }
+
     if se.sub_system != StorageSubSystem::Unknown {
         se.severity = unsafe { mem::transmute(kmsg.severity) };
         se.msg = kmsg.msg;
@@ -186,25 +213,16 @@ fn main() {
     loop {
         let mut buff = [0u8; 8193];
         nix::poll::poll(&mut [pool_fd], -1).unwrap();
-        match nix::unistd::read(fd, &mut buff) {
-            Ok(l) => l,
-            Err(e) => match e {
-                nix::Error::Sys(errno) => {
-                    println!("{}", errno);
-                    break;
-                }
-                _ => 0usize,
-            },
-        };
-        match gen_kmsg(str::from_utf8(&buff).unwrap()) {
-            Some(kmsg) => match kmsg_to_storage_event(kmsg) {
-                Some(mut se) => {
-                    se.hostname = hostname.to_string();
-                    send_event(&se);
-                }
-                None => continue,
-            },
-            None => (),
+        if let Err(e) = nix::unistd::read(fd, &mut buff) {
+            panic!("read on /dev/kmsg got error {:?}", e);
         }
+
+        gen_kmsg(str::from_utf8(&buff).unwrap())
+            .and_then(kmsg_to_storage_event)
+            .and_then(|mut se| {
+                se.hostname = hostname.to_string();
+                send_event(&se);
+                Some(())
+            });
     }
 }
