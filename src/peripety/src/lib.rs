@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 #[repr(u8)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 // https://tools.ietf.org/html/rfc5424#section-6.2.1
 pub enum LogSeverity {
     Emergency = 0,
@@ -14,7 +14,7 @@ pub enum LogSeverity {
     Debug = 7,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum StorageSubSystem {
     Scsi,
     Lvm,

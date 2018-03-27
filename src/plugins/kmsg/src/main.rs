@@ -129,8 +129,6 @@ fn kmsg_to_storage_event(kmsg: Kmsg) -> Option<StorageEvent> {
     // We don't to extensive parsing here, it's other plugins' work.
     // We only set severity, sub_system, dev_name, msg.
     let mut se: StorageEvent = Default::default();
-    se.severity = unsafe { mem::transmute(kmsg.severity) };
-    se.msg = kmsg.msg;
     match kmsg.dict.get("SUBSYSTEM") {
         Some(sub) => {
             match sub.as_ref() {
@@ -141,7 +139,6 @@ fn kmsg_to_storage_event(kmsg: Kmsg) -> Option<StorageEvent> {
                             if dev.starts_with("+scsi:") {
                                 se.dev_name =
                                     dev.trim_left_matches("+scsi:").to_string();
-                                return Some(se);
                             }
                         }
                         None => return None,
@@ -155,21 +152,14 @@ fn kmsg_to_storage_event(kmsg: Kmsg) -> Option<StorageEvent> {
             // Do the hard work on finding sub system.
         }
     }
-
-    None
-}
-
-fn kernel_boot_time() -> u64 {
-    let mut info: libc::sysinfo = unsafe { mem::zeroed() };
-    unsafe {
-        if libc::sysinfo(&mut info) != 0 {
-            panic!(
-                "Failed to invoke libc::sysinfo(): error {}",
-                nix::errno::errno()
-            );
-        }
+    if se.sub_system != StorageSubSystem::Unknown {
+        se.severity = unsafe { mem::transmute(kmsg.severity) };
+        se.msg = kmsg.msg;
+        se.timestamp = Utc::now().timestamp() as u64;
+        Some(se)
+    } else {
+        None
     }
-    Utc::now().timestamp() as u64 - info.uptime as u64
 }
 
 fn send_event(se: &StorageEvent) {
@@ -190,9 +180,7 @@ fn main() {
         .to_str()
         .unwrap();
 
-    let boot_time = kernel_boot_time();
-
-    //    nix::unistd::lseek(fd, 0, nix::unistd::Whence::SeekEnd).unwrap();
+    nix::unistd::lseek(fd, 0, nix::unistd::Whence::SeekEnd).unwrap();
     let pool_fd = nix::poll::PollFd::new(fd, nix::poll::EventFlags::POLLIN);
 
     loop {
@@ -209,18 +197,13 @@ fn main() {
             },
         };
         match gen_kmsg(str::from_utf8(&buff).unwrap()) {
-            Some(kmsg) => {
-                let timestamp =
-                    boot_time + kmsg.montonic_microseconds / 1_000_000;
-                match kmsg_to_storage_event(kmsg) {
-                    Some(mut se) => {
-                        se.hostname = hostname.to_string();
-                        se.timestamp = timestamp;
-                        send_event(&se);
-                    }
-                    None => continue,
+            Some(kmsg) => match kmsg_to_storage_event(kmsg) {
+                Some(mut se) => {
+                    se.hostname = hostname.to_string();
+                    send_event(&se);
                 }
-            }
+                None => continue,
+            },
             None => (),
         }
     }
