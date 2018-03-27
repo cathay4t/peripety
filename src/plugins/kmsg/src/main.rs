@@ -1,5 +1,4 @@
 extern crate chrono;
-extern crate libc;
 extern crate nix;
 extern crate peripety;
 extern crate regex;
