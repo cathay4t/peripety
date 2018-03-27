@@ -16,6 +16,7 @@
     "hostname":             "gris-laptop.example.com",
     "severity":             "info|warn|error",
     "system":               "scsi|lvm|multipath|block|fs|mdraid",
+    "timestamp":            1522130579,
     "event_id":             "uuid_of_event",
     "event_type":           "string_like DM_MPATH_PATH_DOWN",
     "dev_wwid":             "wwid_of_device_related",
