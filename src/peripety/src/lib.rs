@@ -87,8 +87,8 @@ pub struct Ipc {}
 
 impl Ipc {
     pub fn ipc_send(mut stream: &UnixStream, msg: &str) {
-        let msg = format!("{:0padding$}{}", msg.len(), msg,
-                          padding = IPC_HDR_LEN);
+        let msg =
+            format!("{:0padding$}{}", msg.len(), msg, padding = IPC_HDR_LEN);
         stream.write_all(msg.as_bytes()).unwrap();
     }
 

@@ -62,9 +62,7 @@ fn socket_for_sender_plugins(sender: Sender<String>) {
 
 fn start_sender_plugins() {
     let cur_dir = std::env::current_exe().unwrap();
-    let cur_dir = cur_dir.parent()
-        .and_then(|p| p.to_str())
-        .unwrap();
+    let cur_dir = cur_dir.parent().and_then(|p| p.to_str()).unwrap();
     let kmsg_path = format!("{}/{}", cur_dir, "kmsg");
     Command::new(kmsg_path).spawn().unwrap();
 }

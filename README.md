@@ -1,6 +1,7 @@
 <!-- vim-markdown-toc GFM -->
 
 * [Storage Event Notification Daemon](#storage-event-notification-daemon)
+    * [How-to](#how-to)
     * [Event format](#event-format)
     * [Plugin types](#plugin-types)
     * [Workflow](#workflow)
@@ -9,6 +10,19 @@
 <!-- vim-markdown-toc -->
 
 # Storage Event Notification Daemon
+
+## How-to
+
+```bash
+make
+make run
+
+# Then open another terminal to check on daemon's notification.
+make run_stdout
+
+# Then open another terminal to generate some storage errors
+make test
+```
 
 ## Event format
 ```json

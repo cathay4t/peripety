@@ -7,7 +7,7 @@ use nix::fcntl::OFlag;
 use std::str;
 use std::collections::HashMap;
 use regex::Regex;
-use peripety::{LogSeverity, StorageEvent, StorageSubSystem, Ipc};
+use peripety::{Ipc, LogSeverity, StorageEvent, StorageSubSystem};
 use std::mem;
 use chrono::prelude::*;
 
