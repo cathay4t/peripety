@@ -12,7 +12,7 @@ const IPC_BUFF_LEN: usize = 8192;
 static SENDER_SOCKET_FILE: &'static str = "/var/run/peripety/senders";
 
 #[repr(u8)]
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
 // https://tools.ietf.org/html/rfc5424#section-6.2.1
 pub enum LogSeverity {
     Emergency = 0,
@@ -71,6 +71,15 @@ impl Default for StorageEvent {
 impl StorageEvent {
     pub fn to_json_string(&self) -> String {
         serde_json::to_string(&self).unwrap()
+    }
+    pub fn from_json_string(json_string: &str) -> StorageEvent {
+        serde_json::from_str(json_string).unwrap()
+    }
+    pub fn from_slice(buff: &[u8]) -> StorageEvent {
+        // We cannot use serde_json::from_slice, as buff might have trailing \0
+        // where serde_json will raise error.
+        let tmp_s = str::from_utf8(buff).unwrap().trim_right_matches('\0');
+        serde_json::from_str(&tmp_s).unwrap()
     }
 }
 

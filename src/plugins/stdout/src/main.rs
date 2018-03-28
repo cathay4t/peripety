@@ -1,9 +1,10 @@
 extern crate net2;
+extern crate peripety;
 
 use std::net::SocketAddr;
-use std::str;
 use net2::UdpBuilder;
 use net2::unix::UnixUdpBuilderExt;
+use peripety::{StorageEvent, LogSeverity};
 
 fn main() {
     let mut buff = [0u8; 4096];
@@ -13,6 +14,10 @@ fn main() {
     let so = so.bind(addr).unwrap();
     loop {
         so.recv_from(&mut buff).unwrap();
-        println!("got: {}", str::from_utf8(&buff).unwrap());
+        let se = StorageEvent::from_slice(&buff);
+        if se.severity as u8 <= LogSeverity::Warning as u8 {
+            println!("got: {:?}", se);
+        }
+        buff = [0u8; 4096];
     }
 }
