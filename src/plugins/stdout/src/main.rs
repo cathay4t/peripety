@@ -1,8 +1,6 @@
 extern crate net2;
 
 use std::net::SocketAddr;
-use std::time::Duration;
-use std::thread::sleep;
 use std::str;
 use net2::UdpBuilder;
 use net2::unix::UnixUdpBuilderExt;
@@ -14,7 +12,6 @@ fn main() {
     so.reuse_port(true).unwrap();
     let so = so.bind(addr).unwrap();
     loop {
-        sleep(Duration::from_secs(2));
         so.recv_from(&mut buff).unwrap();
         println!("got: {}", str::from_utf8(&buff).unwrap());
     }

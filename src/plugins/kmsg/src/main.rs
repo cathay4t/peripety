@@ -7,7 +7,7 @@ use nix::fcntl::OFlag;
 use std::str;
 use std::collections::HashMap;
 use regex::Regex;
-use peripety::{LogSeverity, StorageEvent, StorageSubSystem};
+use peripety::{LogSeverity, StorageEvent, StorageSubSystem, Ipc};
 use std::mem;
 use chrono::prelude::*;
 
@@ -164,6 +164,8 @@ fn kmsg_to_storage_event(kmsg: Kmsg) -> Option<StorageEvent> {
                         .unwrap_or("")
                         .to_string();
                     se.sub_system = StorageSubSystem::Multipath;
+                    // We do extra work on setting event type to save the
+                    // duplicate regex capture in parser plugin.
                     se.event_type = cap.get(1)
                         .and_then(|m| Some(m.as_str()))
                         .and_then(|a| match a {
@@ -188,10 +190,6 @@ fn kmsg_to_storage_event(kmsg: Kmsg) -> Option<StorageEvent> {
     }
 }
 
-fn send_event(se: &StorageEvent) {
-    println!("{:?}", se);
-}
-
 fn main() {
     let fd = nix::fcntl::open(
         "/dev/kmsg",
@@ -209,6 +207,8 @@ fn main() {
     nix::unistd::lseek(fd, 0, nix::unistd::Whence::SeekEnd).unwrap();
     let pool_fd = nix::poll::PollFd::new(fd, nix::poll::EventFlags::POLLIN);
 
+    let mut stream = Ipc::sender_ipc();
+
     loop {
         let mut buff = [0u8; 8193];
         nix::poll::poll(&mut [pool_fd], -1).unwrap();
@@ -220,7 +220,7 @@ fn main() {
             .and_then(kmsg_to_storage_event)
             .and_then(|mut se| {
                 se.hostname = hostname.to_string();
-                send_event(&se);
+                Ipc::ipc_send(&mut stream, &se.to_json_string());
                 Some(())
             });
     }

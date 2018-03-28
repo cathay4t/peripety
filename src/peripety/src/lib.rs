@@ -1,7 +1,18 @@
+extern crate serde;
+#[macro_use]
+extern crate serde_derive;
+extern crate serde_json;
 use std::collections::HashMap;
+use std::os::unix::net::UnixStream;
+use std::io::{Read, Write};
+use std::str;
+
+const IPC_HDR_LEN: usize = 10;
+const IPC_BUFF_LEN: usize = 8192;
+static SENDER_SOCKET_FILE: &'static str = "/var/run/peripety/senders";
 
 #[repr(u8)]
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 // https://tools.ietf.org/html/rfc5424#section-6.2.1
 pub enum LogSeverity {
     Emergency = 0,
@@ -14,7 +25,7 @@ pub enum LogSeverity {
     Debug = 7,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub enum StorageSubSystem {
     Scsi,
     LvmThin,
@@ -26,7 +37,7 @@ pub enum StorageSubSystem {
     Unknown,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct StorageEvent {
     pub hostname: String,
     pub severity: LogSeverity,
@@ -54,5 +65,41 @@ impl Default for StorageEvent {
             msg: String::new(),
             extention: HashMap::new(),
         }
+    }
+}
+
+impl StorageEvent {
+    pub fn to_json_string(&self) -> String {
+        serde_json::to_string(&self).unwrap()
+    }
+}
+
+pub struct Ipc {}
+
+impl Ipc {
+    pub fn ipc_send(mut stream: &UnixStream, msg: &str) {
+        let msg = format!("{:0padding$}{}", msg.len(), msg,
+                          padding = IPC_HDR_LEN);
+        stream.write_all(msg.as_bytes()).unwrap();
+    }
+
+    pub fn ipc_recv(stream: &mut UnixStream) -> String {
+        let mut msg_buff = [0u8; IPC_HDR_LEN];
+        stream.read_exact(&mut msg_buff).unwrap();
+        let msg_len =
+            str::from_utf8(&msg_buff).unwrap().parse::<usize>().unwrap();
+        let mut msg = Vec::with_capacity(msg_len);
+        let mut got: usize = 0;
+        let mut msg_buff = [0u8; IPC_BUFF_LEN];
+        while got < msg_len {
+            let cur_got = stream.read(&mut msg_buff).unwrap();
+            msg.extend_from_slice(&msg_buff[0..cur_got]);
+            got += cur_got;
+        }
+        String::from_utf8(msg).unwrap()
+    }
+
+    pub fn sender_ipc() -> UnixStream {
+        UnixStream::connect(SENDER_SOCKET_FILE).unwrap()
     }
 }
