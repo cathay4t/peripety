@@ -9,6 +9,7 @@ use std::path::Path;
 use std::fs;
 use peripety::Ipc;
 use std::thread;
+use std::process::Command;
 
 fn multicast_for_receiver_plugins(reciever: Receiver<String>) {
     let addr: Ipv4Addr = "127.0.0.1".parse().unwrap();
@@ -41,6 +42,7 @@ fn socket_for_sender_plugins(sender: Sender<String>) {
         fs::remove_file(&ipc_file).unwrap();
     }
     let listener = UnixListener::bind(ipc_file).unwrap();
+    sender.send("socket ready".to_string()).unwrap();
     for stream in listener.incoming() {
         match stream {
             Ok(stream) => {
@@ -58,6 +60,15 @@ fn socket_for_sender_plugins(sender: Sender<String>) {
     }
 }
 
+fn start_sender_plugins() {
+    let cur_dir = std::env::current_exe().unwrap();
+    let cur_dir = cur_dir.parent()
+        .and_then(|p| p.to_str())
+        .unwrap();
+    let kmsg_path = format!("{}/{}", cur_dir, "kmsg");
+    Command::new(kmsg_path).spawn().unwrap();
+}
+
 fn main() {
     let (out_mc_send, out_mc_recv) = mpsc::channel();
     let (sender_send, sender_recv) = mpsc::channel();
@@ -69,6 +80,11 @@ fn main() {
     spawn(move || {
         socket_for_sender_plugins(sender_send);
     });
+
+    // Wait for sender socket ready.
+    sender_recv.recv().unwrap();
+
+    start_sender_plugins();
 
     loop {
         let msg: String = sender_recv.recv().unwrap();
