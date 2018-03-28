@@ -1,8 +1,21 @@
 #!/bin/bash -x
 
+
 sudo modprobe scsi_debug dev_size_mb=500
-sudo pvcreate /dev/sdb
-sudo vgcreate vg /dev/sdb
+for x in /sys/block/*; do
+    model=$(sed -e 's/ \+$//' $x/device/model)
+    if [ "CHK$model" == "CHKscsi_debug" ];then
+        disk=$(basename $x)
+        break
+    fi
+done
+if [ "CHK$disk" == "CHK" ];then
+    echo "BUG: Failed to find scsi_debug disks"
+    exit 1
+fi
+
+sudo pvcreate /dev/$disk
+sudo vgcreate vg /dev/$disk
 sudo lvcreate -n ThinPoolLV -L 200M vg
 sudo lvcreate -n ThinMetaLV -L 50M vg
 sudo lvconvert \
