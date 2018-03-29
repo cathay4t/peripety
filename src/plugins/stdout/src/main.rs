@@ -15,7 +15,7 @@ fn main() {
     loop {
         so.recv_from(&mut buff).unwrap();
         let se = StorageEvent::from_slice(&buff);
-        if se.severity as u8 <= LogSeverity::Warning as u8 {
+        if se.severity as u8 <= LogSeverity::Notice as u8 {
             println!("got: {:?}", se);
         }
         buff = [0u8; 4096];
