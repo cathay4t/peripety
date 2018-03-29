@@ -4,11 +4,13 @@ all:
 tidy:
 	cargo fmt
 
-run:
-	cd src/peripety && cargo run
+run: all
+	sudo mkdir /var/run/peripety/ || :
+	sudo chown $$UID /var/run/peripety/
+	cd ./src/peripetyd && cargo run
 
-run_stdout:
-	cd src/plugins/stdout/ && caro run
+run_stdout: all
+	cd src/plugins/stdout/ && cargo run
 
 test:
 	./tests/scsi.sh
