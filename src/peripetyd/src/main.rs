@@ -8,11 +8,10 @@ use std::sync::mpsc::{Receiver, Sender};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::Path;
 use std::fs;
-use peripety::Ipc;
+use peripety::{Ipc, StorageEvent, StorageSubSystem};
 use std::thread;
 use std::process::Command;
-use std::collections::HashMap;
-use nix::poll::PollFd;
+use nix::sys::select::FdSet;
 use std::os::unix::io::AsRawFd;
 
 static IPC_DIR: &'static str = "/var/run/peripety";
@@ -78,11 +77,15 @@ fn collector_msg_to_parsers(
 ) {
     loop {
         let msg: String = collector_recv.recv().unwrap();
+        let e: StorageEvent = StorageEvent::from_json_string(&msg);
         for so in parsers_so {
             //TODO(Gris Ge): Plugins might wait on other slow plugin.
             //               Plugins should use queue to hold the
             //               events instead of blocking daemon.
-            Ipc::ipc_send(&so, &msg);
+            //TODO(Gris Ge): Do filtering.
+            if e.sub_system == StorageSubSystem::Multipath {
+                Ipc::ipc_send(&so, &msg);
+            }
         }
     }
 }
@@ -91,21 +94,20 @@ fn parser_msg_to_daemon(
     parser_send: Sender<String>,
     parsers_so: &Vec<UnixStream>,
 ) {
-    let mut poll_fds: Vec<PollFd> = Vec::new();
-    let mut so_fd_hash = HashMap::new();
-    for so in parsers_so {
-        let fd = so.as_raw_fd();
-        so_fd_hash.insert(fd, so);
-        poll_fds.push(nix::poll::PollFd::new(
-            so.as_raw_fd(),
-            nix::poll::EventFlags::POLLIN,
-        ));
-    }
     loop {
-        let fd = nix::poll::poll(&mut poll_fds, -1).unwrap();
-        parser_send.send(Ipc::ipc_recv(
-            *so_fd_hash.get_mut(&fd).unwrap()
-                )).unwrap();
+        let mut fds = FdSet::new();
+        for so in parsers_so {
+            fds.insert(so.as_raw_fd());
+        }
+        nix::sys::select::select(None, Some(&mut fds), None, None,
+        None).unwrap();
+        for so in parsers_so {
+            let fd = so.as_raw_fd();
+            if fds.contains(fd) {
+                let msg = Ipc::ipc_recv(&so);
+                parser_send.send(msg).unwrap();
+            }
+        }
     }
 }
 
@@ -115,6 +117,9 @@ fn start_parser_plugin(name: &str) -> UnixStream {
     let cur_dir = cur_dir.parent().and_then(|p| p.to_str()).unwrap();
     let plugin_path = format!("{}/{}", cur_dir, name);
 
+    if Path::new(&ipc_file).exists() {
+        fs::remove_file(&ipc_file).unwrap();
+    }
     let listener = UnixListener::bind(ipc_file).unwrap();
     Command::new(plugin_path).spawn().unwrap();
     listener.incoming().next().unwrap().unwrap()

@@ -213,7 +213,12 @@ fn main() {
         let mut buff = [0u8; 8193];
         nix::poll::poll(&mut [poll_fd], -1).unwrap();
         if let Err(e) = nix::unistd::read(fd, &mut buff) {
-            panic!("read on /dev/kmsg got error {:?}", e);
+            if let nix::Error::Sys(nix::errno::Errno::EPIPE) = e {
+                // /dev/kmsg circular buffer full, retry.
+                continue;
+            } else {
+                panic!("read on /dev/kmsg got error {:?}", e);
+            }
         }
 
         gen_kmsg(str::from_utf8(&buff).unwrap())
