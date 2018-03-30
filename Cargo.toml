@@ -3,5 +3,7 @@ members = [
     "src/peripetyd",
     "src/plugins/kmsg",
     "src/plugins/stdout",
+    "src/plugins/mpath",
     "src/peripety",
+    "src/dmmp",
 ]

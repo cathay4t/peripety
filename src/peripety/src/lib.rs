@@ -10,6 +10,7 @@ use std::str;
 const IPC_HDR_LEN: usize = 10;
 const IPC_BUFF_LEN: usize = 8192;
 static SENDER_SOCKET_FILE: &'static str = "/var/run/peripety/senders";
+static PARSER_SOCKET_FILE_PREFIX: &'static str = "/var/run/peripety/parser_";
 
 #[repr(u8)]
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
@@ -92,7 +93,7 @@ impl Ipc {
         stream.write_all(msg.as_bytes()).unwrap();
     }
 
-    pub fn ipc_recv(stream: &mut UnixStream) -> String {
+    pub fn ipc_recv(mut stream: &UnixStream) -> String {
         let mut msg_buff = [0u8; IPC_HDR_LEN];
         stream.read_exact(&mut msg_buff).unwrap();
         let msg_len =
@@ -110,5 +111,10 @@ impl Ipc {
 
     pub fn sender_ipc() -> UnixStream {
         UnixStream::connect(SENDER_SOCKET_FILE).unwrap()
+    }
+
+    pub fn parser_ipc(name: &str) -> UnixStream {
+        UnixStream::connect(format!("{}{}", PARSER_SOCKET_FILE_PREFIX, name))
+            .unwrap()
     }
 }

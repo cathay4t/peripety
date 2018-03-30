@@ -45,9 +45,9 @@ make test
 ```
 
 ## Plugin types
-* **Sender**
+* **Collector**
 
-  Generate raw event.
+  Collect raw event.
   For raw event, the `dev_id` might be missing, but `dev_name` might be not
   be human friendly(for example, SCSI disk event might have "4:0:0:1").
   All events will send to parser to generate synthetic event.
@@ -74,7 +74,7 @@ make test
 * Daemon start all plugins and establish socket connections to each sender
   and parser.
 * Daemon and receiver listen on IP multicast socket.
-* Sender plugins gather events and send to daemon.
+* Collector plugins gather events and send to daemon.
 * Daemon send events to plugins base on their filter settings.
 * Parser plugins do the heavy work and generate synthetic event if needed.
 * Daemon send all synthetic events to receiver plugins via IP multicast socket.
@@ -86,7 +86,7 @@ make test
 receiver_multicast_ip = "127.0.0.1"
 
 [kmsg]
-type = "sender"
+type = "collector"
 
 [mpath]
 type = "parser"

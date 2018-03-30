@@ -1,3 +1,4 @@
+extern crate nix;
 extern crate peripety;
 
 use std::net::{Ipv4Addr, UdpSocket};
@@ -10,6 +11,11 @@ use std::fs;
 use peripety::Ipc;
 use std::thread;
 use std::process::Command;
+use std::collections::HashMap;
+use nix::poll::PollFd;
+use std::os::unix::io::AsRawFd;
+
+static IPC_DIR: &'static str = "/var/run/peripety";
 
 fn multicast_for_receiver_plugins(reciever: Receiver<String>) {
     let addr: Ipv4Addr = "127.0.0.1".parse().unwrap();
@@ -25,19 +31,18 @@ fn multicast_for_receiver_plugins(reciever: Receiver<String>) {
     }
 }
 
-fn handle_sender_plugin_ipc(mut stream: UnixStream, sender: Sender<String>) {
+fn handle_collector_plugin_ipc(mut stream: UnixStream, sender: Sender<String>) {
     loop {
         sender.send(Ipc::ipc_recv(&mut stream)).unwrap();
     }
 }
 
-fn socket_for_sender_plugins(sender: Sender<String>) {
-    let ipc_dir = "/var/run/peripety".to_string();
-    if !Path::new(&ipc_dir).is_dir() {
-        fs::create_dir(&ipc_dir)
-            .expect(&format!("Failed to create dir '{}'", ipc_dir));
+fn socket_for_collector_plugins(sender: Sender<String>) {
+    if !Path::new(IPC_DIR).is_dir() {
+        fs::create_dir(IPC_DIR)
+            .expect(&format!("Failed to create dir '{}'", IPC_DIR));
     }
-    let ipc_file = format!("{}/senders", ipc_dir);
+    let ipc_file = format!("{}/senders", IPC_DIR);
     if Path::new(&ipc_file).exists() {
         fs::remove_file(&ipc_file).unwrap();
     }
@@ -49,7 +54,7 @@ fn socket_for_sender_plugins(sender: Sender<String>) {
                 let new_sender = sender.clone();
                 /* connection succeeded */
                 thread::spawn(move || {
-                    handle_sender_plugin_ipc(stream, new_sender);
+                    handle_collector_plugin_ipc(stream, new_sender);
                 });
             }
             Err(_) => {
@@ -60,32 +65,101 @@ fn socket_for_sender_plugins(sender: Sender<String>) {
     }
 }
 
-fn start_sender_plugins() {
+fn start_collector_plugins() {
     let cur_dir = std::env::current_exe().unwrap();
     let cur_dir = cur_dir.parent().and_then(|p| p.to_str()).unwrap();
     let kmsg_path = format!("{}/{}", cur_dir, "kmsg");
     Command::new(kmsg_path).spawn().unwrap();
 }
 
+fn collector_msg_to_parsers(
+    collector_recv: Receiver<String>,
+    parsers_so: &Vec<UnixStream>,
+) {
+    loop {
+        let msg: String = collector_recv.recv().unwrap();
+        for so in parsers_so {
+            //TODO(Gris Ge): Plugins might wait on other slow plugin.
+            //               Plugins should use queue to hold the
+            //               events instead of blocking daemon.
+            Ipc::ipc_send(&so, &msg);
+        }
+    }
+}
+
+fn parser_msg_to_daemon(
+    parser_send: Sender<String>,
+    parsers_so: &Vec<UnixStream>,
+) {
+    let mut poll_fds: Vec<PollFd> = Vec::new();
+    let mut so_fd_hash = HashMap::new();
+    for so in parsers_so {
+        let fd = so.as_raw_fd();
+        so_fd_hash.insert(fd, so);
+        poll_fds.push(nix::poll::PollFd::new(
+            so.as_raw_fd(),
+            nix::poll::EventFlags::POLLIN,
+        ));
+    }
+    loop {
+        let fd = nix::poll::poll(&mut poll_fds, -1).unwrap();
+        parser_send.send(Ipc::ipc_recv(
+            *so_fd_hash.get_mut(&fd).unwrap()
+                )).unwrap();
+    }
+}
+
+fn start_parser_plugin(name: &str) -> UnixStream {
+    let ipc_file = format!("{}/parser_{}", IPC_DIR, name);
+    let cur_dir = std::env::current_exe().unwrap();
+    let cur_dir = cur_dir.parent().and_then(|p| p.to_str()).unwrap();
+    let plugin_path = format!("{}/{}", cur_dir, name);
+
+    let listener = UnixListener::bind(ipc_file).unwrap();
+    Command::new(plugin_path).spawn().unwrap();
+    listener.incoming().next().unwrap().unwrap()
+}
+
+fn start_parser_plugins() -> Vec<UnixStream> {
+    let mut rc: Vec<UnixStream> = Vec::new();
+    rc.push(start_parser_plugin("mpath"));
+    rc
+}
+
 fn main() {
     let (out_mc_send, out_mc_recv) = mpsc::channel();
-    let (sender_send, sender_recv) = mpsc::channel();
+    let (collector_send, collector_recv) = mpsc::channel();
+    let (parser_send, parser_recv) = mpsc::channel();
 
     spawn(move || {
         multicast_for_receiver_plugins(out_mc_recv);
     });
 
     spawn(move || {
-        socket_for_sender_plugins(sender_send);
+        socket_for_collector_plugins(collector_send);
     });
 
     // Wait for sender socket ready.
-    sender_recv.recv().unwrap();
+    collector_recv.recv().unwrap();
 
-    start_sender_plugins();
+    start_collector_plugins();
+
+    let parsers_so = start_parser_plugins();
+    let mut parsers_so_dup = Vec::new();
+    for so in &parsers_so {
+        parsers_so_dup.push(so.try_clone().unwrap());
+    }
+
+    spawn(move || {
+        collector_msg_to_parsers(collector_recv, &parsers_so);
+    });
+
+    spawn(move || {
+        parser_msg_to_daemon(parser_send, &parsers_so_dup);
+    });
 
     loop {
-        let msg: String = sender_recv.recv().unwrap();
+        let msg: String = parser_recv.recv().unwrap();
         out_mc_send.send(msg).unwrap();
     }
 }

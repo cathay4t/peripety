@@ -5,3 +5,4 @@ authors = ["Gris Ge <cnfourt@gmail.com>"]
 
 [dependencies]
 peripety = { path = "../peripety" }
+nix = "0.10.0"

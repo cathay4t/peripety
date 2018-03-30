@@ -205,13 +205,13 @@ fn main() {
         .unwrap();
 
     nix::unistd::lseek(fd, 0, nix::unistd::Whence::SeekEnd).unwrap();
-    let pool_fd = nix::poll::PollFd::new(fd, nix::poll::EventFlags::POLLIN);
+    let poll_fd = nix::poll::PollFd::new(fd, nix::poll::EventFlags::POLLIN);
 
     let mut stream = Ipc::sender_ipc();
 
     loop {
         let mut buff = [0u8; 8193];
-        nix::poll::poll(&mut [pool_fd], -1).unwrap();
+        nix::poll::poll(&mut [poll_fd], -1).unwrap();
         if let Err(e) = nix::unistd::read(fd, &mut buff) {
             panic!("read on /dev/kmsg got error {:?}", e);
         }
