@@ -13,6 +13,9 @@ run_stdout: all
 	cd src/plugins/stdout/ && cargo run
 
 test:
-	./tests/scsi.sh
-	./tests/lvm_tp.sh
+	# ./tests/scsi.sh
+	# ./tests/lvm_tp.sh
 	./tests/dmmp.sh
+
+clean:
+	cargo clean
