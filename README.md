@@ -47,41 +47,43 @@ make test
 ## Plugin types
 * **Collector**
 
-  Collect raw event.
-  For raw event, the `dev_id` might be missing, but `dev_name` might be not
-  be human friendly(for example, SCSI disk event might have "4:0:0:1").
-  All events will send to parser to generate synthetic event.
-  Example would be `udev` and `kmsg` plugins.
+  Collects raw events.
+  For a raw event, `dev_id` might be missing but `dev_name` might not
+  be human friendly (for example, a SCSI disk event might have `dev_name`
+  "4:0:0:1").
+
+  Examples: `udev` and `kmsg` plugins.
 
 * **Parser**
 
-  Parser both raw and synthetic events, then generate synthetic events to
+  Parses both raw and synthetic events then generates synthetic events for
   receivers.
-  For synthetic event, the `dev_id` is valid and consistent, `dev_name`
-  is human friendly.
-  Allow filtering on incoming events.
-  Example plugins would be `multipath`, `scsi`, `block`, `fs`, `mdraid`.
+  For the generated synthetic events the parser must provide a valid and
+  consistent `dev_id` and human-friendly `dev_name` value.
+  Restricts the events it parses to an appropriate subset using a filter.
+
+  Examples: `multipath`, `scsi`, `block`, `fs`, and `mdraid` plugins.
 
 * **Receiver**
 
-  Pluing is listening on all events, and make actions against events. Does
-  not allow filter on incoming events.
-  Example send events to journald/email/irc/websocket/etc.
+  Listens to all events, and generates appropriate actions.
+
+  Examples: `journald`, `email`, `irc`, etc.
+
   TODO: Create a receiver plugin to cache data.
 
 ## Workflow
 
 ![work flow](./peripety_design.png)
 
-0. Daemon start all plugins and establish socket connections to each sender
-   and parser.
-1. Kernel generate a event in /dev/kmsg.
-2. The `kmsg` collector plugin gather the event and send the raw event to daemon.
-3. Daemon send event to parser plugins base on their filter settings.
-4. Parser plugin `mpath` do the heavy work and send synthetic event back to
-   daemon.
-5. Daemon send all synthetic events to receiver plugins via IP multicast
-   socket.
+0. The daemon starts all plugins and establishes socket connections to each
+parser and collector plugin.
+
+1. The kernel generates an event in /dev/kmsg.
+2. The `kmsg` collector plugin gathers the event and sends the raw event to the daemon.
+3. The daemon sends the event to selected parser plugins based on their filter settings.
+4. The selected parser plugins process the event and each sends a synthetic event back to the daemon.
+5. The daemon broadcasts all synthetic events to receiver plugins via an IP multicast socket.
 
 ## Plugin conf
 
