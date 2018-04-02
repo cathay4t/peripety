@@ -71,7 +71,7 @@ make test
 
 ## Workflow
 
-![work flow](http://url/to/img.png)
+![work flow](./peripety_design.png)
 
 0. Daemon start all plugins and establish socket connections to each sender
    and parser.
