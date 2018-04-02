@@ -12,7 +12,7 @@ run: all
 run_stdout: all
 	cd src/plugins/stdout/ && cargo run
 
-test:
+check:
 	# ./tests/scsi.sh
 	# ./tests/lvm_tp.sh
 	./tests/dmmp.sh
