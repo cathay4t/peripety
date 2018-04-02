@@ -71,19 +71,25 @@ make test
 
 ## Workflow
 
-* Daemon start all plugins and establish socket connections to each sender
-  and parser.
-* Daemon and receiver listen on IP multicast socket.
-* Collector plugins gather events and send to daemon.
-* Daemon send events to plugins base on their filter settings.
-* Parser plugins do the heavy work and generate synthetic event if needed.
-* Daemon send all synthetic events to receiver plugins via IP multicast socket.
+![work flow](http://url/to/img.png)
+
+0. Daemon start all plugins and establish socket connections to each sender
+   and parser.
+1. Kernel generate a event in /dev/kmsg.
+2. The `kmsg` collector plugin gather the event and send the raw event to daemon.
+3. Daemon send event to parser plugins base on their filter settings.
+4. Parser plugin `mpath` do the heavy work and send synthetic event back to
+   daemon.
+5. Daemon send all synthetic events to receiver plugins via IP multicast
+   socket.
 
 ## Plugin conf
 
 ```toml
 [main]
-receiver_multicast_ip = "127.0.0.1"
+receiver_bind_ip = "127.0.0.1"
+receiver_multicast_ip = "239.0.0.1"
+receiver_multicast_port = "6000"
 
 [kmsg]
 type = "collector"
