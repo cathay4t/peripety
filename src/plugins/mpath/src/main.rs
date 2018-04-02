@@ -35,7 +35,7 @@ fn main() {
         let msg = Ipc::ipc_recv(&so);
         let mut e: StorageEvent = StorageEvent::from_json_string(&msg);
         handle_event(&mut e);
-        if e.dev_wwid.is_empty() {
+        if ! e.dev_wwid.is_empty() {
             Ipc::ipc_send(&so, &StorageEvent::to_json_string(&e));
         }
     }

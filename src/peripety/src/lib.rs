@@ -87,10 +87,8 @@ pub struct Ipc {}
 
 impl Ipc {
     pub fn ipc_send(mut stream: &UnixStream, msg: &str) {
-        println!("ipc_send len {}", msg.len());
         let msg =
             format!("{:0padding$}{}", msg.len(), msg, padding = IPC_HDR_LEN);
-        println!("msg {}", msg);
         stream.write_all(msg.as_bytes()).unwrap();
     }
 
@@ -99,10 +97,8 @@ impl Ipc {
         stream.read_exact(&mut msg_buff).unwrap();
         let msg_len =
             str::from_utf8(&msg_buff).unwrap().parse::<usize>().unwrap();
-        println!("ipc_recv len {}", msg_len);
         let mut msg = vec![0u8; msg_len];
         stream.read_exact(msg.as_mut_slice()).unwrap();
-        println!("msg {}", String::from_utf8(msg.clone()).unwrap());
         String::from_utf8(msg).unwrap()
     }
 
