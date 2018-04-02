@@ -207,7 +207,7 @@ fn main() {
     nix::unistd::lseek(fd, 0, nix::unistd::Whence::SeekEnd).unwrap();
     let poll_fd = nix::poll::PollFd::new(fd, nix::poll::EventFlags::POLLIN);
 
-    let mut stream = Ipc::sender_ipc();
+    let stream = Ipc::sender_ipc();
 
     loop {
         let mut buff = [0u8; 8193];
@@ -225,7 +225,7 @@ fn main() {
             .and_then(kmsg_to_storage_event)
             .and_then(|mut se| {
                 se.hostname = hostname.to_string();
-                Ipc::ipc_send(&mut stream, &se.to_json_string());
+                Ipc::ipc_send(&stream, &se.to_json_string());
                 Some(())
             });
     }

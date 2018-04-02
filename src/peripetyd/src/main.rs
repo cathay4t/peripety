@@ -16,7 +16,7 @@ use std::os::unix::io::AsRawFd;
 
 static IPC_DIR: &'static str = "/var/run/peripety";
 
-fn multicast_for_receiver_plugins(reciever: Receiver<String>) {
+fn multicast_for_receiver_plugins(reciever: &Receiver<String>) {
     let addr: Ipv4Addr = "127.0.0.1".parse().unwrap();
     let mcast_group: Ipv4Addr = "239.0.0.1".parse().unwrap();
     let port: u16 = 6000;
@@ -30,13 +30,13 @@ fn multicast_for_receiver_plugins(reciever: Receiver<String>) {
     }
 }
 
-fn handle_collector_plugin_ipc(mut stream: UnixStream, sender: Sender<String>) {
+fn handle_collector_plugin_ipc(stream: &UnixStream, sender: &Sender<String>) {
     loop {
-        sender.send(Ipc::ipc_recv(&mut stream)).unwrap();
+        sender.send(Ipc::ipc_recv(stream)).unwrap();
     }
 }
 
-fn socket_for_collector_plugins(sender: Sender<String>) {
+fn socket_for_collector_plugins(sender: &Sender<String>) {
     if !Path::new(IPC_DIR).is_dir() {
         fs::create_dir(IPC_DIR)
             .expect(&format!("Failed to create dir '{}'", IPC_DIR));
@@ -53,7 +53,7 @@ fn socket_for_collector_plugins(sender: Sender<String>) {
                 let new_sender = sender.clone();
                 /* connection succeeded */
                 thread::spawn(move || {
-                    handle_collector_plugin_ipc(stream, new_sender);
+                    handle_collector_plugin_ipc(&stream, &new_sender);
                 });
             }
             Err(_) => {
@@ -72,8 +72,8 @@ fn start_collector_plugins() {
 }
 
 fn collector_msg_to_parsers(
-    collector_recv: Receiver<String>,
-    parsers_so: &Vec<UnixStream>,
+    collector_recv: &Receiver<String>,
+    parsers_so: &[UnixStream],
 ) {
     loop {
         let msg: String = collector_recv.recv().unwrap();
@@ -84,15 +84,15 @@ fn collector_msg_to_parsers(
             //               events instead of blocking daemon.
             //TODO(Gris Ge): Do filtering.
             if e.sub_system == StorageSubSystem::Multipath {
-                Ipc::ipc_send(&so, &msg);
+                Ipc::ipc_send(so, &msg);
             }
         }
     }
 }
 
 fn parser_msg_to_daemon(
-    parser_send: Sender<String>,
-    parsers_so: &Vec<UnixStream>,
+    parser_send: &Sender<String>,
+    parsers_so: &[UnixStream],
 ) {
     loop {
         let mut fds = FdSet::new();
@@ -104,7 +104,7 @@ fn parser_msg_to_daemon(
         for so in parsers_so {
             let fd = so.as_raw_fd();
             if fds.contains(fd) {
-                let msg = Ipc::ipc_recv(&so);
+                let msg = Ipc::ipc_recv(so);
                 parser_send.send(msg).unwrap();
             }
         }
@@ -137,11 +137,11 @@ fn main() {
     let (parser_send, parser_recv) = mpsc::channel();
 
     spawn(move || {
-        multicast_for_receiver_plugins(out_mc_recv);
+        multicast_for_receiver_plugins(&out_mc_recv);
     });
 
     spawn(move || {
-        socket_for_collector_plugins(collector_send);
+        socket_for_collector_plugins(&collector_send);
     });
 
     // Wait for sender socket ready.
@@ -156,11 +156,11 @@ fn main() {
     }
 
     spawn(move || {
-        collector_msg_to_parsers(collector_recv, &parsers_so);
+        collector_msg_to_parsers(&collector_recv, &parsers_so);
     });
 
     spawn(move || {
-        parser_msg_to_daemon(parser_send, &parsers_so_dup);
+        parser_msg_to_daemon(&parser_send, &parsers_so_dup);
     });
 
     loop {

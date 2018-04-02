@@ -8,7 +8,6 @@ use std::io::{Read, Write};
 use std::str;
 
 const IPC_HDR_LEN: usize = 10;
-const IPC_BUFF_LEN: usize = 8192;
 static SENDER_SOCKET_FILE: &'static str = "/var/run/peripety/senders";
 static PARSER_SOCKET_FILE_PREFIX: &'static str = "/var/run/peripety/parser_";
 
@@ -80,7 +79,7 @@ impl StorageEvent {
         // We cannot use serde_json::from_slice, as buff might have trailing \0
         // where serde_json will raise error.
         let tmp_s = str::from_utf8(buff).unwrap().trim_right_matches('\0');
-        serde_json::from_str(&tmp_s).unwrap()
+        serde_json::from_str(tmp_s).unwrap()
     }
 }
 
