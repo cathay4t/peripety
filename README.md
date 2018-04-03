@@ -1,6 +1,9 @@
 <!-- vim-markdown-toc GFM -->
 
 * [Storage Event Notification Daemon](#storage-event-notification-daemon)
+    * [Why another daemon?](#why-another-daemon)
+        * [Why not expand udisks for this?](#why-not-expand-udisks-for-this)
+        * [Why this tool is better?](#why-this-tool-is-better)
     * [How-to](#how-to)
     * [Event format](#event-format)
     * [Plugin types](#plugin-types)
@@ -10,6 +13,25 @@
 <!-- vim-markdown-toc -->
 
 # Storage Event Notification Daemon
+
+## Why another daemon?
+
+### Why not expand udisks for this?
+
+ * Current design of udisks require modules written in C which is not a good
+   language for string manipulation which is quit common when parsing eventing.
+
+ * Udisks components are trigger by uevent which only have add/change/del
+   event type defined, modules need to extra work to find out what just
+   happened. Yes, we can change udisks to support event types, but IMHO, that
+   require much more work than creating new storage event daemon in rust.
+
+### Why this tool is better?
+
+ * Rust is memory-leak-proof and quite easy to handle threading, IPC and string
+   manipulation.
+
+ * Only do one thing quick and simple -- provide storage events.
 
 ## How-to
 
