@@ -18,9 +18,9 @@ dd if=/dev/urandom of=/tmp/haha count=400 bs=1M
 # inode when sectore failure.
 modprobe scsi_debug
 dmsetup create bad_disk << EOF
-  0 10000       linear /dev/sdb 0
+  0 10000       linear /dev/$disk 0
   10000 1       error
-  10001 1010000 linear /dev/sdb 10001
+  10001 1010000 linear /dev/$disk 10001
 EOF
 
 # Buffer I/O
