@@ -41,7 +41,7 @@
 4,1257,9473175718,-;JBD2: Detected IO errors while flushing file data on sdf-8
 ```
 
- * Root cause - Disk SMART data:
+ * Root cause - Disk SMART data(targetcli does not support SMART, pseudo below)
    ```
     {
         event_type: "SMART_DISK_FAIL",
