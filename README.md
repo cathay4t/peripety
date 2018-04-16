@@ -54,6 +54,7 @@ make test
     "system":               "scsi|lvm|multipath|block|fs|mdraid",
     "timestamp":            1522130579,
     "event_id":             "uuid_of_event",
+    "root_cause_event_id":  "uudi_of_event_of_root_cause",
     "event_type":           "string_like DM_MPATH_PATH_DOWN",
     "dev_wwid":             "wwid_of_device_related",
     "dev_name":             "device_name",

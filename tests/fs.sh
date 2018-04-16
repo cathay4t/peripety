@@ -12,22 +12,21 @@ for x in /sys/block/*; do
     fi
 done
 
-dd if=/dev/urandom of=/tmp/haha count=400 bs=1M
-
 # Write failure, but read will pass as file system will find another
 # inode when sectore failure.
-modprobe scsi_debug
 dmsetup create bad_disk << EOF
   0 10000       linear /dev/$disk 0
   10000 1       error
   10001 1010000 linear /dev/$disk 10001
 EOF
 
+dd if=/dev/urandom of=/tmp/haha count=400 bs=1M
+
 # Buffer I/O
 dd if=/dev/urandom of=/dev/mapper/bad_disk bs=512 count=1 seek=10000
 
 # Ext4
-mkfs.ext4 /dev/mapper/bad_disk
+mkfs.ext4 -f /dev/mapper/bad_disk
 
 mount /dev/mapper/bad_disk /mnt
 cp -f /tmp/haha /mnt/
