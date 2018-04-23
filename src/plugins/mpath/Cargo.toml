@@ -1,8 +1,0 @@
-[package]
-name = "mpath"
-version = "0.1.0"
-authors = ["Gris Ge <fge@redhat.com>"]
-
-[dependencies]
-dmmp = { path = "../../dmmp" }
-peripety = { path = "../../peripety" }

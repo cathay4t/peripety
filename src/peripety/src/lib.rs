@@ -3,13 +3,8 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 use std::collections::HashMap;
-use std::os::unix::net::UnixStream;
-use std::io::{Read, Write};
 use std::str;
-
-const IPC_HDR_LEN: usize = 10;
-static SENDER_SOCKET_FILE: &'static str = "/var/run/peripety/senders";
-static PARSER_SOCKET_FILE_PREFIX: &'static str = "/var/run/peripety/parser_";
+use std::str::FromStr;
 
 #[repr(u8)]
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
@@ -25,19 +20,45 @@ pub enum LogSeverity {
     Debug = 7,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
+impl FromStr for LogSeverity {
+    type Err = ();
+    fn from_str(s: &str) -> Result<LogSeverity, ()> {
+        match s.as_ref() {
+            "0" => Ok(LogSeverity::Emergency),
+            "1" => Ok(LogSeverity::Alert),
+            "2" => Ok(LogSeverity::Ctritical),
+            "3" => Ok(LogSeverity::Error),
+            "4" => Ok(LogSeverity::Warning),
+            "5" => Ok(LogSeverity::Notice),
+            "6" => Ok(LogSeverity::Info),
+            "7" => Ok(LogSeverity::Debug),
+            _ => Err(()),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
 pub enum StorageSubSystem {
     Scsi,
     LvmThin,
     Multipath,
-    Block,
-    Fs,
-    Mdraid,
     Other,
     Unknown,
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+impl FromStr for StorageSubSystem {
+    type Err = ();
+    fn from_str(s: &str) -> Result<StorageSubSystem, ()> {
+        match s.to_uppercase().as_ref() {
+            "SCSI" => Ok(StorageSubSystem::Scsi),
+            "LVMTHIN" => Ok(StorageSubSystem::LvmThin),
+            "MULTIPATH" => Ok(StorageSubSystem::Multipath),
+            _ => Ok(StorageSubSystem::Unknown),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct StorageEvent {
     pub hostname: String,
     pub severity: LogSeverity,
@@ -47,6 +68,8 @@ pub struct StorageEvent {
     pub event_type: String,
     pub dev_wwid: String,
     pub dev_name: String,
+    pub dev_path: String,
+    pub kdev: String,       // kernel device name.
     pub msg: String,
     pub extention: HashMap<String, String>,
 }
@@ -62,6 +85,8 @@ impl Default for StorageEvent {
             event_type: String::new(),
             dev_wwid: String::new(),
             dev_name: String::new(),
+            dev_path: String::new(),
+            kdev: String::new(),
             msg: String::new(),
             extention: HashMap::new(),
         }
@@ -80,34 +105,5 @@ impl StorageEvent {
         // where serde_json will raise error.
         let tmp_s = str::from_utf8(buff).unwrap().trim_right_matches('\0');
         serde_json::from_str(tmp_s).unwrap()
-    }
-}
-
-pub struct Ipc {}
-
-impl Ipc {
-    pub fn ipc_send(mut stream: &UnixStream, msg: &str) {
-        let msg =
-            format!("{:0padding$}{}", msg.len(), msg, padding = IPC_HDR_LEN);
-        stream.write_all(msg.as_bytes()).unwrap();
-    }
-
-    pub fn ipc_recv(mut stream: &UnixStream) -> String {
-        let mut msg_buff = [0u8; IPC_HDR_LEN];
-        stream.read_exact(&mut msg_buff).unwrap();
-        let msg_len =
-            str::from_utf8(&msg_buff).unwrap().parse::<usize>().unwrap();
-        let mut msg = vec![0u8; msg_len];
-        stream.read_exact(msg.as_mut_slice()).unwrap();
-        String::from_utf8(msg).unwrap()
-    }
-
-    pub fn sender_ipc() -> UnixStream {
-        UnixStream::connect(SENDER_SOCKET_FILE).unwrap()
-    }
-
-    pub fn parser_ipc(name: &str) -> UnixStream {
-        UnixStream::connect(format!("{}{}", PARSER_SOCKET_FILE_PREFIX, name))
-            .unwrap()
     }
 }

@@ -1,0 +1,7 @@
+[package]
+name = "sdjournal"
+version = "0.1.0"
+authors = ["Tony Asleson <tasleson@redhat.com>"]
+
+[dependencies]
+libc = "0.2.30"

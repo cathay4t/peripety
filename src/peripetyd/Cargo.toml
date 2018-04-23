@@ -5,4 +5,6 @@ authors = ["Gris Ge <cnfourt@gmail.com>"]
 
 [dependencies]
 peripety = { path = "../peripety" }
+sdjournal = { path = "../sdjournal" }
 nix = "0.10.0"
+regex = "0.2.10"

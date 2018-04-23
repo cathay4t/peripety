@@ -1,9 +1,6 @@
 [workspace]
 members = [
     "src/peripetyd",
-    "src/plugins/kmsg",
-    "src/plugins/stdout",
-    "src/plugins/mpath",
+    "src/sdjournal",
     "src/peripety",
-    "src/dmmp",
 ]
