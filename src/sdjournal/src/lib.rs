@@ -132,6 +132,8 @@ extern "C" {
         data: *mut *mut c_void,
         length: *mut size_t,
     ) -> c_int;
+    fn sd_journal_get_realtime_usec(j: *mut SdJournal, usec: *mut u64)
+        -> c_int;
 
     fn sd_journal_get_fd(j: *mut SdJournal) -> c_int;
 
@@ -279,6 +281,17 @@ impl Journal {
                 )));
             }
         }
+        let mut usec: u64 = 0;
+        let rc =
+            unsafe { sd_journal_get_realtime_usec(self.handle, &mut usec) };
+        if rc == 0 {
+            result.insert("__REALTIME_TIMESTAMP".to_string(), usec.to_string());
+        } else {
+            return Err(SdJournalError::CError(ClibraryError::new(
+                String::from("Error on sd_journal_get_realtime_usec"),
+                rc,
+            )));
+        }
 
         Ok(result)
     }
@@ -295,7 +308,7 @@ impl Journal {
                 rc,
             )));
         }
-        let rc = unsafe {sd_journal_previous_skip(self.handle, 1)};
+        let rc = unsafe { sd_journal_previous_skip(self.handle, 1) };
         // Workaround as sd_journal_seek_tail() dose not get you to the
         // very end.
         if rc < 0 {

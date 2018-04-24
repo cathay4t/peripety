@@ -69,7 +69,7 @@ pub struct StorageEvent {
     pub dev_wwid: String,
     pub dev_name: String,
     pub dev_path: String,
-    pub kdev: String,       // kernel device name.
+    pub kdev: String,       // internal use-only: kernel device name.
     pub msg: String,
     pub extention: HashMap<String, String>,
 }

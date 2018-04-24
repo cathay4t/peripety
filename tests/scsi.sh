@@ -14,4 +14,5 @@ fi
 set -x
 sudo dd if=/dev/$disk of=/dev/null
 set +x
+sleep 1
 sudo modprobe -r scsi_debug
