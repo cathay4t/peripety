@@ -2,3 +2,5 @@
  * Remove all unwrap().
  * Parser plugin for journald for user space logs.
  * Allow user to configure regex on kmsg plugin.
+ * Expand mpath parser to include FC/FCoE/iSCSI path information.
+ * Support multipathd user space logs.
