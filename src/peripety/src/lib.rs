@@ -39,11 +39,13 @@ impl FromStr for LogSeverity {
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
 pub enum StorageSubSystem {
+    Unknown,
+    Other,
     Scsi,
     LvmThin,
     Multipath,
-    Other,
-    Unknown,
+    FsExt4,
+    Nvme,
 }
 
 impl FromStr for StorageSubSystem {
@@ -53,6 +55,8 @@ impl FromStr for StorageSubSystem {
             "SCSI" => Ok(StorageSubSystem::Scsi),
             "LVMTHIN" => Ok(StorageSubSystem::LvmThin),
             "MULTIPATH" => Ok(StorageSubSystem::Multipath),
+            "EXT4" => Ok(StorageSubSystem::FsExt4),
+            "NVME" => Ok(StorageSubSystem::Nvme),
             _ => Ok(StorageSubSystem::Unknown),
         }
     }
@@ -69,6 +73,10 @@ pub struct StorageEvent {
     pub dev_wwid: String,
     pub dev_name: String,
     pub dev_path: String,
+    pub holders_wwids: Vec<String>,
+    pub holders_names: Vec<String>,
+    pub holders_paths: Vec<String>,
+    // ^ What devices does current dev_wwid depending on.
     pub kdev: String,       // internal use-only: kernel device name.
     pub msg: String,
     pub extention: HashMap<String, String>,
@@ -86,6 +94,9 @@ impl Default for StorageEvent {
             dev_wwid: String::new(),
             dev_name: String::new(),
             dev_path: String::new(),
+            holders_wwids: Vec::new(),
+            holders_names: Vec::new(),
+            holders_paths: Vec::new(),
             kdev: String::new(),
             msg: String::new(),
             extention: HashMap::new(),

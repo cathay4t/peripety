@@ -48,6 +48,7 @@ fn process_journal_entry(
             entry.get("_KERNEL_SUBSYSTEM").unwrap().parse().unwrap();
         event.kdev = entry.get("_KERNEL_DEVICE").unwrap().to_string();
     }
+
     for regex_conf in regex_confs {
         let msg = entry.get("MESSAGE").unwrap();
         // Save CPU from regex.captures() if starts_with() failed.
@@ -80,6 +81,7 @@ fn process_journal_entry(
             break;
         }
     }
+
     if event.sub_system == StorageSubSystem::Unknown || event.kdev.len() == 0 {
         return;
     }
