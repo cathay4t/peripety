@@ -1,4 +1,3 @@
- * Send events to journald.
  * Support of NVMe logs.
  * Support of DM logs.
  * Support of mdraid logs.

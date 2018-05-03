@@ -53,7 +53,8 @@ fn handle_events_from_parsers(
         // Send to stdout
         println!("{}", event.to_json_string_pretty());
 
-        // Send to journald
+        // Send to journald.
+        // TODO(Gris Ge): Invoke a thread of this in case sdjournal slows us.
         send_to_journald(&event);
 
         // Send to parser if parser require it.
