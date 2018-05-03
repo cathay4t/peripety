@@ -2,6 +2,7 @@
  * Support of NVMe logs.
  * Support of DM logs.
  * Support of mdraid logs.
+ * Support of `/etc/peripetyd.conf`.
  * Create a AI-like root cause analyze thread.
  * Add license lines to all code files.
  * Remove all unwrap().

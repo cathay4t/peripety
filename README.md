@@ -8,7 +8,7 @@
     * [Event format](#event-format)
     * [Thread types](#thread-types)
     * [Workflow](#workflow)
-    * [Plugin conf (TODO)](#plugin-conf-todo)
+    * [Daemon Configuration (TODO)](#daemon-configuration-todo)
 
 <!-- vim-markdown-toc -->
 
@@ -106,7 +106,9 @@ make test
    event back to the daemon.
 5. The daemon broadcasts all synthetic events to notifier threads.
 
-## Plugin conf (TODO)
+## Daemon Configuration (TODO)
+
+The configuration file will be `/etc/peripetyd.conf`, example:
 
 ```toml
 [main]
