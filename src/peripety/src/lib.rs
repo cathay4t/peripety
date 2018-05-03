@@ -110,6 +110,9 @@ impl StorageEvent {
     pub fn to_json_string(&self) -> String {
         serde_json::to_string(&self).unwrap()
     }
+    pub fn to_json_string_pretty(&self) -> String {
+        serde_json::to_string_pretty(&self).unwrap()
+    }
     pub fn from_json_string(json_string: &str) -> StorageEvent {
         serde_json::from_str(json_string).unwrap()
     }

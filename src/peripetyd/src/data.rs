@@ -133,6 +133,15 @@ pub const BUILD_IN_REGEX_CONFS: &[RegexConfStr] = &[
         event_type: "DM_FS_MOUNTED",
     },
     RegexConfStr {
+        starts_with: "XFS ",
+        regex: r"(?x)
+                ^XFS \s
+                \((?P<kdev>[^\s\)]+)\):\s
+                writeback\ error\ on\ sector",
+        sub_system: "xfs",
+        event_type: "DM_FS_IO_ERROR",
+    },
+    RegexConfStr {
         starts_with: "EXT4-fs ",
         regex: r"(?x)
                 ^EXT4-fs\s

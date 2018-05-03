@@ -8,3 +8,4 @@ peripety = { path = "../peripety" }
 sdjournal = { path = "../sdjournal" }
 nix = "0.10.0"
 regex = "0.2.10"
+libc = "0.2.40"

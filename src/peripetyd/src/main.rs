@@ -24,7 +24,7 @@ fn handle_events_from_parsers(
         let event = recver.recv().unwrap();
 
         // Send to stdout
-        println!("{}", event.to_json_string());
+        println!("{}", event.to_json_string_pretty());
 
         // Send to parser if parser require it.
         for parser in parsers {
@@ -75,7 +75,7 @@ fn main() {
 
     // 1. Start parser threads
     parsers.push(mpath::parser_start(notifier_send.clone()));
-    //    parsers.push(scsi::parser_start(notifier_send.clone()));
+    parsers.push(scsi::parser_start(notifier_send.clone()));
     parsers.push(fs::parser_start(notifier_send.clone()));
 
     let parsers_clone = parsers.clone();
