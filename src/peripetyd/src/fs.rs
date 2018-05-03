@@ -1,7 +1,7 @@
 extern crate peripety;
 extern crate regex;
 
-use data::{EventType, ParserInfo, BlkInfo};
+use data::{BlkInfo, BlkType, EventType, ParserInfo};
 use std::sync::mpsc;
 use std::sync::mpsc::Sender;
 use peripety::{StorageEvent, StorageSubSystem};
@@ -15,8 +15,8 @@ fn uuid_of_blk(blk_path: &str) -> String {
         if let Ok(p) = fs::read_link(&path) {
             let link_path =
                 format!("/dev/disk/by-uuid/{}", p.to_str().unwrap());
-            let link_path = Path::new(&link_path).canonicalize().unwrap();
-            let cur_path = link_path.to_str().unwrap();
+            let cur_path = Path::new(&link_path).canonicalize().unwrap();
+            let blk_path = Path::new(&blk_path).canonicalize().unwrap();
             if cur_path == blk_path {
                 return path.file_name().unwrap().to_str().unwrap().to_string();
             }
@@ -34,14 +34,12 @@ fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {
         }
         event.dev_name = blk_info.name.clone();
         event.dev_path = blk_info.blk_path.clone();
-        event.holders_wwids = blk_info.holders_wwids;
-        event.holders_names = blk_info.holders_names;
-        event.holders_paths = blk_info.holders_paths;
-        if event.holders_wwids.len() == 0 {
-            event.holders_wwids.push(blk_info.wwid);
-            event.holders_names.push(blk_info.name);
-            event.holders_paths.push(blk_info.blk_path);
-        }
+        event.owners_wwids = blk_info.owners_wwids;
+        event.owners_names = blk_info.owners_names;
+        event.owners_paths = blk_info.owners_paths;
+        event.owners_wwids.insert(0, blk_info.wwid);
+        event.owners_names.insert(0, blk_info.name);
+        event.owners_paths.insert(0, blk_info.blk_path);
 
         sender.send(event).unwrap();
     }
@@ -51,7 +49,8 @@ pub fn parser_start(sender: Sender<StorageEvent>) -> ParserInfo {
     let (event_in_sender, event_in_recver) = mpsc::channel();
     let name = "fs".to_string();
     let filter_event_type = vec![EventType::Raw];
-    let filter_event_subsys = vec![StorageSubSystem::FsExt4];
+    let filter_event_subsys =
+        vec![StorageSubSystem::FsExt4, StorageSubSystem::FsXfs];
 
     spawn(move || loop {
         let event = event_in_recver.recv().unwrap();

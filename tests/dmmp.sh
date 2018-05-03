@@ -14,9 +14,35 @@ if [ "CHK$disk" == "CHK" ];then
     exit 1
 fi
 
+cat | sudo tee /etc/multipath.conf  << EOL
+defaults {
+    user_friendly_names     yes
+    max_fds 20000
+    uxsock_timeout 10000
+}
+
+blacklist {
+    device {
+        vendor .*
+        product .*
+    }
+}
+blacklist_exceptions {
+    device {
+        vendor Linux
+        product scsi_debug
+    }
+    device {
+        vendor LIO-ORG
+        product .*
+    }
+}
+EOL
+
 sudo modprobe dm-multipath
 sudo systemctl restart multipathd
 sudo multipath -ll
+
 echo offline | sudo tee /sys/block/$disk/device/state
 sleep 30
 echo running | sudo tee /sys/block/$disk/device/state

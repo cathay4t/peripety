@@ -333,7 +333,8 @@ impl Journal {
             }
 
             if log_entry == 0 {
-                // TODO: Figure out how to make a match work when comparing int to enum type.
+                // TODO: Figure out how to make a match work when comparing int
+                // to enum type.
                 let wait_rc =
                     unsafe { sd_journal_wait(self.handle, self.timeout_us) };
 

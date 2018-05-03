@@ -7,6 +7,7 @@ mod mpath;
 mod data;
 mod scsi;
 mod fs;
+mod dm;
 
 use data::{EventType, ParserInfo};
 use peripety::StorageEvent;
@@ -74,7 +75,7 @@ fn main() {
 
     // 1. Start parser threads
     parsers.push(mpath::parser_start(notifier_send.clone()));
-//    parsers.push(scsi::parser_start(notifier_send.clone()));
+    //    parsers.push(scsi::parser_start(notifier_send.clone()));
     parsers.push(fs::parser_start(notifier_send.clone()));
 
     let parsers_clone = parsers.clone();

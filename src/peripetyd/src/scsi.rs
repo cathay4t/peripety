@@ -3,7 +3,7 @@ extern crate regex;
 
 //mod data;
 
-use data::{EventType, ParserInfo, Sysfs, BlkInfo, BlkType};
+use data::{BlkInfo, BlkType, EventType, ParserInfo, Sysfs};
 use std::sync::mpsc;
 use std::sync::mpsc::Sender;
 use peripety::{StorageEvent, StorageSubSystem};
@@ -29,13 +29,13 @@ pub fn blk_info_get_scsi(kdev: &str) -> Option<BlkInfo> {
                     blk_type: BlkType::Partition,
                     blk_path: format!("/dev/{}", &kdev),
                     name: kdev.to_string(),
-                    holders_wwids: vec![blk_info.wwid],
-                    holders_types: vec![BlkType::Scsi],
-                    holders_names: vec![blk_info.name],
-                    holders_paths: vec![blk_info.blk_path],
+                    owners_wwids: vec![blk_info.wwid],
+                    owners_types: vec![BlkType::Scsi],
+                    owners_names: vec![blk_info.name],
+                    owners_paths: vec![blk_info.blk_path],
                 });
             } else {
-                return None
+                return None;
             }
         }
     }
@@ -43,7 +43,7 @@ pub fn blk_info_get_scsi(kdev: &str) -> Option<BlkInfo> {
     // Try 4:0:0:1 format
     let mut sysfs_path = format!("/sys/class/scsi_disk/{}/device/wwid", &kdev);
     if Path::new(&sysfs_path).exists() {
-        name =  Sysfs::scsi_id_to_blk_name(kdev);
+        name = Sysfs::scsi_id_to_blk_name(kdev);
     } else {
         // Try sda format
         sysfs_path = format!("/sys/block/{}/device/wwid", &kdev);
@@ -56,10 +56,10 @@ pub fn blk_info_get_scsi(kdev: &str) -> Option<BlkInfo> {
             blk_type: BlkType::Scsi,
             blk_path: format!("/dev/{}", &name),
             name: name,
-            holders_wwids: Vec::new(),
-            holders_types: Vec::new(),
-            holders_names: Vec::new(),
-            holders_paths: Vec::new(),
+            owners_wwids: Vec::new(),
+            owners_types: Vec::new(),
+            owners_names: Vec::new(),
+            owners_paths: Vec::new(),
         });
     }
 
@@ -69,7 +69,10 @@ pub fn blk_info_get_scsi(kdev: &str) -> Option<BlkInfo> {
 }
 
 fn pretty_wwid(wwid: &str) -> String {
-    Regex::new(r"[ \t]+").map(|r|r.replace_all(wwid.trim(), "-")).unwrap().to_string()
+    Regex::new(r"[ \t]+")
+        .map(|r| r.replace_all(wwid.trim(), "-"))
+        .unwrap()
+        .to_string()
 }
 
 fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {

@@ -45,6 +45,7 @@ pub enum StorageSubSystem {
     LvmThin,
     Multipath,
     FsExt4,
+    FsXfs,
     Nvme,
 }
 
@@ -56,6 +57,7 @@ impl FromStr for StorageSubSystem {
             "LVMTHIN" => Ok(StorageSubSystem::LvmThin),
             "MULTIPATH" => Ok(StorageSubSystem::Multipath),
             "EXT4" => Ok(StorageSubSystem::FsExt4),
+            "XFS" => Ok(StorageSubSystem::FsXfs),
             "NVME" => Ok(StorageSubSystem::Nvme),
             _ => Ok(StorageSubSystem::Unknown),
         }
@@ -73,11 +75,11 @@ pub struct StorageEvent {
     pub dev_wwid: String,
     pub dev_name: String,
     pub dev_path: String,
-    pub holders_wwids: Vec<String>,
-    pub holders_names: Vec<String>,
-    pub holders_paths: Vec<String>,
+    pub owners_wwids: Vec<String>,
+    pub owners_names: Vec<String>,
+    pub owners_paths: Vec<String>,
     // ^ What devices does current dev_wwid depending on.
-    pub kdev: String,       // internal use-only: kernel device name.
+    pub kdev: String, // internal use-only: kernel device name.
     pub msg: String,
     pub extention: HashMap<String, String>,
 }
@@ -94,9 +96,9 @@ impl Default for StorageEvent {
             dev_wwid: String::new(),
             dev_name: String::new(),
             dev_path: String::new(),
-            holders_wwids: Vec::new(),
-            holders_names: Vec::new(),
-            holders_paths: Vec::new(),
+            owners_wwids: Vec::new(),
+            owners_names: Vec::new(),
+            owners_paths: Vec::new(),
             kdev: String::new(),
             msg: String::new(),
             extention: HashMap::new(),

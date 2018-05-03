@@ -2,6 +2,7 @@ extern crate peripety;
 extern crate regex;
 
 use scsi;
+use dm;
 use regex::Regex;
 use std::sync::mpsc::Sender;
 use peripety::{StorageEvent, StorageSubSystem};
@@ -50,7 +51,7 @@ impl<'a> RegexConfStr<'a> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, PartialEq, Debug)]
 pub enum BlkType {
     Scsi,
     Nvme,
@@ -66,14 +67,18 @@ pub struct BlkInfo {
     pub blk_type: BlkType,
     pub name: String,
     pub blk_path: String,
-    pub holders_wwids: Vec<String>,
-    pub holders_types: Vec<BlkType>,
-    pub holders_names: Vec<String>,
-    pub holders_paths: Vec<String>,
+    pub owners_wwids: Vec<String>,
+    pub owners_types: Vec<BlkType>,
+    pub owners_names: Vec<String>,
+    pub owners_paths: Vec<String>,
 }
 
 impl BlkInfo {
     pub fn new(kdev: &str) -> Option<BlkInfo> {
+        if kdev.starts_with("dm") {
+            return dm::blk_info_get_dm(kdev);
+        }
+
         if kdev.starts_with("sd") {
             return scsi::blk_info_get_scsi(kdev);
         }
@@ -116,6 +121,15 @@ pub const BUILD_IN_REGEX_CONFS: &[RegexConfStr] = &[
                 mounted\ filesystem\s
                 ",
         sub_system: "ext4",
+        event_type: "DM_FS_MOUNTED",
+    },
+    RegexConfStr {
+        starts_with: "XFS ",
+        regex: r"(?x)
+                ^XFS \s
+                \((?P<kdev>[^\s\)]+)\):\s
+                Ending\ clean\ mount",
+        sub_system: "xfs",
         event_type: "DM_FS_MOUNTED",
     },
     RegexConfStr {

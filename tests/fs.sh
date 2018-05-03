@@ -1,4 +1,7 @@
 #!/bin/bash
+MNT_POINT=`mktemp -d`;
+TMP_FILE=`mktemp`;
+
 sudo modprobe scsi_debug dev_size_mb=500
 
 for x in /sys/block/*; do
@@ -20,7 +23,7 @@ sudo dmsetup create bad_disk << EOF
   10001 1010000 linear /dev/$disk 10001
 EOF
 
-sudo dd if=/dev/urandom of=/tmp/haha count=470 bs=1M
+sudo dd if=/dev/urandom of=$TMP_FILE count=470 bs=1M
 
 # Buffer I/O
 sudo dd if=/dev/urandom of=/dev/mapper/bad_disk bs=512 count=1 seek=10000
@@ -28,20 +31,20 @@ sudo dd if=/dev/urandom of=/dev/mapper/bad_disk bs=512 count=1 seek=10000
 # Ext4
 sudo mkfs.ext4 -F /dev/mapper/bad_disk
 
-sudo mount /dev/mapper/bad_disk /mnt
-sudo cp -f /tmp/haha /mnt/
-sudo md5sum /tmp/haha /mnt/haha
-sudo umount /mnt
+sudo mount /dev/mapper/bad_disk $MNT_POINT
+sudo cp -f $TMP_FILE $MNT_POINT/haha
+sudo md5sum $TMP_FILE $MNT_POINT/haha
+sudo umount $MNT_POINT
 
 # xfs
 sudo mkfs.xfs -f /dev/mapper/bad_disk
 
-sudo mount /dev/mapper/bad_disk /mnt
-sudo cp -f /tmp/haha /mnt/
-sudo md5sum /tmp/haha /mnt/haha
-sudo umount /mnt
+sudo mount /dev/mapper/bad_disk $MNT_POINT
+sudo cp -f $TMP_FILE $MNT_POINT/haha
+sudo md5sum $TMP_FILE $MNT_POINT/haha
+sudo umount $MNT_POINT
 
 # Clean up
-sudo rm /tmp/haha
+sudo rm $TMP_FILE
 sudo dmsetup remove bad_disk
 sudo modprobe -r scsi_debug
