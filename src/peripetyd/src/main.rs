@@ -80,20 +80,25 @@ fn main() {
 
     let parsers_clone = parsers.clone();
 
-    // 2. Forward collector output to parsers.
+    // 2. Start thread for forwarding collector output to parsers.
     spawn(move || {
         collector_to_parsers(&collector_recv, &parsers);
     });
 
-    // 3. Forward parsers output to parsers and notifier.
+    // 3. Start thread for forwarding parsers output to parsers and notifier.
     spawn(move || {
         handle_events_from_parsers(&notifier_recv, &parsers_clone);
     });
+
+    // TODO(Gris Ge): Need better way for waiting threads to be ready.
+    thread::sleep(time::Duration::from_secs(5));
 
     // 4. Start collector thread
     spawn(move || {
         collector::new(&collector_send);
     });
+
+    println!("Peripetyd: Ready!");
 
     loop {
         //TODO(Gris Ge): Maybe we should monitor on configuration file changes.
