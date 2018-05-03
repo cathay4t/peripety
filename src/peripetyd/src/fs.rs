@@ -48,7 +48,6 @@ fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {
         event.owners_wwids.insert(0, blk_info.wwid);
         event.owners_names.insert(0, blk_info.name);
         let mnt_pnt = get_mount_point(&blk_info.blk_path);
-        println!("HAHA: '{}'", mnt_pnt);
         if mnt_pnt.len() != 0 {
             event.extention.insert("mount_point".to_string(), mnt_pnt);
         }
