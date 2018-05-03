@@ -56,9 +56,9 @@ make test
     "dev_wwid":             "wwid_of_device_related",
     "dev_name":             "device_name",
     "dev_path":             "device_path in /dev/ folder",
-    "owners_wwids":         ["wwids of owner devices"]
-    "owners_names":         ["names of owner devices"]
-    "owners_paths":         ["paths of owner devices"]
+    "owners_wwids":         ["wwids of owner devices"],
+    "owners_names":         ["names of owner devices"],
+    "owners_paths":         ["paths of owner devices"],
     "msg":                  "human_readable_message",
     "extentions":           {
         "plugin_specifc_1":     "value_1",
