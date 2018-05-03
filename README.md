@@ -98,7 +98,7 @@ make test
 ![work flow](./peripety_design.png)
 
 0. The daemon starts all threads.
-1. The `collector` thread collects an event in /dev/kmsg.
+1. The `collector` thread collects an event from journald.
 2. The `collector` thread parse the event and sends the raw event to the daemon.
 3. The daemon sends the event to selected parser threads based on their filter
    settings.
