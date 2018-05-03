@@ -1,6 +1,10 @@
+ * Send events to journald.
+ * Support of NVMe logs.
+ * Support of DM logs.
+ * Support of mdraid logs.
+ * Create a AI-like root cause analyze thread.
  * Add license lines to all code files.
  * Remove all unwrap().
- * Parser plugin for journald for user space logs.
  * Allow user to configure regex on kmsg plugin.
  * Expand mpath parser to include FC/FCoE/iSCSI path information.
  * Support multipathd user space logs.
