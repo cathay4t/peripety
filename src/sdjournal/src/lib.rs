@@ -12,7 +12,6 @@ use std::os::raw::c_char;
 use std::slice;
 use std::u64;
 use std::fmt;
-use std::ptr;
 use std::collections::HashMap;
 
 use std::os::unix::io::{AsRawFd, RawFd};
@@ -124,7 +123,6 @@ extern "C" {
     fn sd_journal_seek_tail(j: *mut SdJournal) -> c_int;
     fn sd_journal_previous_skip(j: *mut SdJournal, skip: u64) -> c_int;
 
-    fn sd_journal_send(message: *const u8, ...) -> c_int;
     fn sd_journal_sendv(iovs: *const libc::iovec, n: c_int) -> c_int;
 
     fn sd_journal_restart_data(j: *mut SdJournal);
@@ -391,67 +389,6 @@ pub fn send_journal_list(
     if rc < 0 {
         return Err(SdJournalError::CError(ClibraryError::new(
             String::from("Error on sd_journal_sendv"),
-            rc,
-        )));
-    }
-    Ok(true)
-}
-
-pub fn send_journal_basic(
-    message_id: &'static str,
-    message: &str,
-    source: &str,
-    source_man: &str,
-    device: &str,
-    device_id: &str,
-    state: &str,
-    priority: JournalPriority,
-    details: String,
-) -> Result<bool, SdJournalError> {
-    let msg_id = CString::new(format!("MESSAGE_ID={}", message_id))?;
-    let device_cstr = CString::new(format!("DEVICE={}", device))?;
-    let device_id_cstr = CString::new(format!("DEVICE_ID={}", device_id))?;
-    let state_cstr = CString::new(format!("STATE={}", state))?;
-    let source_cstr = CString::new(format!("SOURCE={}", source))?;
-    let source_man_cstr = CString::new(format!("SOURCE_MAN={}", source_man))?;
-    let details_cstr = CString::new(format!("DETAILS={}", details))?;
-    let priority_cstr = CString::new(format!("PRIORITY={}", priority as u8))?;
-
-    let priority_desc = match priority {
-        JournalPriority::Emergency => "emergency",
-        JournalPriority::Alert => "alert",
-        JournalPriority::Critical => "critical",
-        JournalPriority::Error => "error",
-        JournalPriority::Warning => "warning",
-        JournalPriority::Notice => "notice",
-        JournalPriority::Info => "info",
-        JournalPriority::Debug => "debug",
-    };
-
-    let priority_desc_cstr =
-        CString::new(format!("PRIORITY_DESC={}", priority_desc))?;
-    let message_cstr = CString::new(format!("MESSAGE={}", message))?;
-    let end_args: *const u8 = ptr::null();
-
-    let rc = unsafe {
-        sd_journal_send(
-            msg_id.as_ptr() as *const u8, // MESSAGE_ID
-            device_cstr.as_ptr(),         // DEVICE
-            device_id_cstr.as_ptr(),      // DEVICE_ID
-            state_cstr.as_ptr(),          // STATE
-            source_cstr.as_ptr(),         // SOURCE
-            source_man_cstr.as_ptr(),     // SOURCE_MAN
-            details_cstr.as_ptr(),        // DETAILS
-            priority_cstr.as_ptr(),       // PRIORITY
-            priority_desc_cstr.as_ptr(),  // PRIORITY_DESC
-            message_cstr.as_ptr(),        // MESSAGE
-            end_args,                     // End the arguments
-        )
-    };
-
-    if rc < 0 {
-        return Err(SdJournalError::CError(ClibraryError::new(
-            String::from("Error on sd_journal_send"),
             rc,
         )));
     }
