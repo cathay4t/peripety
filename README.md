@@ -114,14 +114,13 @@ make test
 [[collector_regexs]]
 # This regex is already build-in.
 starts_with = "device-mapper: multipath:"
-regex = '''
-(?x)
+regex = '''(?x)
         ^device-mapper:\s
         multipath:\ Failing\ path\s
         (?P<kdev>\d+:\d+).$
 '''
 # `kdev` naming capture group is mandatory.
 # `sub_system` naming capture group is optional.
-sub_system = "multipath",
-event_type = "DM_MPATH_PATH_FAILED",
+sub_system = "multipath"
+event_type = "DM_MPATH_PATH_FAILED"
 ```
