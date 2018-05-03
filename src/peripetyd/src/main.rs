@@ -1,6 +1,7 @@
 extern crate nix;
 extern crate peripety;
 extern crate regex;
+extern crate sdjournal;
 
 mod collector;
 mod mpath;
@@ -16,6 +17,32 @@ use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
 use std::{thread, time};
 
+fn send_to_journald(event: &StorageEvent) {
+    let mut logs = Vec::new();
+    logs.push(("IS_PERIPETY".to_string(), "TRUE".to_string()));
+    logs.push(("PRIORITY".to_string(), format!("{}", event.severity as u8)));
+    logs.push(("MESSAGE".to_string(), event.msg.clone()));
+    logs.push(("DEV_WWID".to_string(), event.dev_wwid.clone()));
+    logs.push(("DEV_NAME".to_string(), event.dev_name.clone()));
+    logs.push(("DEV_PATH".to_string(), event.dev_path.clone()));
+    for owners_wwid in &event.owners_wwids {
+        logs.push(("OWNERS_WWIDS".to_string(), owners_wwid.clone()));
+    }
+    for owners_name in &event.owners_names {
+        logs.push(("OWNERS_NAMES".to_string(), owners_name.clone()));
+    }
+    for owners_path in &event.owners_paths {
+        logs.push(("OWNERS_PATHS".to_string(), owners_path.clone()));
+    }
+    for (key, value) in &event.extention {
+        logs.push((format!("EXT_{}", key.to_uppercase()), value.clone()));
+    }
+    logs.push(("EVENT_TYPE".to_string(), event.event_type.clone()));
+    logs.push(("EVENT_ID".to_string(), event.event_id.clone()));
+    logs.push(("SUB_SYSTEM".to_string(), event.sub_system.to_string()));
+    sdjournal::send_journal_list(&logs);
+}
+
 fn handle_events_from_parsers(
     recver: &Receiver<StorageEvent>,
     parsers: &Vec<ParserInfo>,
@@ -25,6 +52,9 @@ fn handle_events_from_parsers(
 
         // Send to stdout
         println!("{}", event.to_json_string_pretty());
+
+        // Send to journald
+        send_to_journald(&event);
 
         // Send to parser if parser require it.
         for parser in parsers {
@@ -91,7 +121,7 @@ fn main() {
     });
 
     // TODO(Gris Ge): Need better way for waiting threads to be ready.
-    thread::sleep(time::Duration::from_secs(5));
+    //    thread::sleep(time::Duration::from_secs(1));
 
     // 4. Start collector thread
     spawn(move || {

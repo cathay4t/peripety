@@ -64,6 +64,22 @@ impl FromStr for StorageSubSystem {
     }
 }
 
+impl std::fmt::Display for StorageSubSystem {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match *self {
+            StorageSubSystem::Unknown => write!(fmt, "Unknown"),
+            StorageSubSystem::Other => write!(fmt, "Other"),
+            StorageSubSystem::Scsi => write!(fmt, "SCSI"),
+            StorageSubSystem::LvmThin => write!(fmt, "LvmThin"),
+            StorageSubSystem::Multipath => write!(fmt, "Multipath"),
+            StorageSubSystem::FsExt4 => write!(fmt, "FsExt4"),
+            StorageSubSystem::FsXfs => write!(fmt, "FsXfs"),
+            StorageSubSystem::Nvme => write!(fmt, "NVMe"),
+        }
+    }
+}
+
+
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct StorageEvent {
     pub hostname: String,

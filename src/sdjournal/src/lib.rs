@@ -125,6 +125,7 @@ extern "C" {
     fn sd_journal_previous_skip(j: *mut SdJournal, skip: u64) -> c_int;
 
     fn sd_journal_send(message: *const u8, ...) -> c_int;
+    fn sd_journal_sendv(iovs: *const libc::iovec, n: c_int) -> c_int;
 
     fn sd_journal_restart_data(j: *mut SdJournal);
     fn sd_journal_enumerate_data(
@@ -367,6 +368,33 @@ impl Journal {
     ) -> Option<Result<HashMap<String, String>, SdJournalError>> {
         self.get_next_entry()
     }
+}
+
+pub fn send_journal_list(
+    logs: &[(String, String)],
+) -> Result<bool, SdJournalError> {
+    let mut iovs: Vec<libc::iovec> = Vec::new();
+    let mut msgs: Vec<CString> = Vec::new(); // to hold the lifetime of msg.
+    for &(ref key, ref value) in logs {
+        let msg = CString::new(format!("{}={}", key, value))?;
+        msgs.push(msg);
+    }
+    for msg in &msgs {
+        let len = msg.as_bytes().len();
+        iovs.push(libc::iovec {
+            iov_base: msg.as_ptr() as *mut libc::c_void,
+            iov_len: len,
+        });
+    }
+    let rc =
+        unsafe { sd_journal_sendv(iovs.as_ptr(), iovs.len() as c_int) };
+    if rc < 0 {
+        return Err(SdJournalError::CError(ClibraryError::new(
+            String::from("Error on sd_journal_sendv"),
+            rc,
+        )));
+    }
+    Ok(true)
 }
 
 pub fn send_journal_basic(
