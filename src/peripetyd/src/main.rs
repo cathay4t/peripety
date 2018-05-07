@@ -1,3 +1,4 @@
+extern crate chan_signal;
 extern crate nix;
 extern crate peripety;
 extern crate regex;
@@ -12,10 +13,11 @@ mod dm;
 
 use data::{EventType, ParserInfo};
 use peripety::StorageEvent;
-use std::thread::spawn;
+use std::thread::{sleep, spawn};
+use std::time::Duration;
 use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
-use std::{thread, time};
+use chan_signal::Signal;
 
 fn send_to_journald(event: &StorageEvent) {
     let mut logs = Vec::new();
@@ -40,7 +42,7 @@ fn send_to_journald(event: &StorageEvent) {
     logs.push(("EVENT_TYPE".to_string(), event.event_type.clone()));
     logs.push(("EVENT_ID".to_string(), event.event_id.clone()));
     logs.push(("SUB_SYSTEM".to_string(), event.sub_system.to_string()));
-    sdjournal::send_journal_list(&logs);
+    sdjournal::send_journal_list(&logs).unwrap();
 }
 
 fn handle_events_from_parsers(
@@ -102,7 +104,10 @@ fn collector_to_parsers(
 fn main() {
     let (collector_send, collector_recv) = mpsc::channel();
     let (notifier_send, notifier_recv) = mpsc::channel();
+    let (conf_send, conf_recv) = mpsc::channel();
     let mut parsers: Vec<ParserInfo> = Vec::new();
+
+    let conf_changed_signal = chan_signal::notify(&[Signal::HUP]);
 
     // 1. Start parser threads
     parsers.push(mpath::parser_start(notifier_send.clone()));
@@ -122,18 +127,17 @@ fn main() {
     });
 
     // TODO(Gris Ge): Need better way for waiting threads to be ready.
-    //    thread::sleep(time::Duration::from_secs(1));
+    sleep(Duration::from_secs(1));
 
     // 4. Start collector thread
     spawn(move || {
-        collector::new(&collector_send);
+        collector::new(&collector_send, &conf_recv);
     });
 
     println!("Peripetyd: Ready!");
 
     loop {
-        //TODO(Gris Ge): Maybe we should monitor on configuration file changes.
-        //               or check threads status.
-        thread::sleep(time::Duration::from_secs(600));
+        conf_changed_signal.recv().unwrap();
+        conf_send.send(true).unwrap();
     }
 }

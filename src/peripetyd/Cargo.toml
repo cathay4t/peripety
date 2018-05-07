@@ -4,8 +4,10 @@ version = "0.1.0"
 authors = ["Gris Ge <cnfourt@gmail.com>"]
 
 [dependencies]
-peripety = { path = "../peripety" }
-sdjournal = { path = "../sdjournal" }
+peripety = { path = "../peripety", version = "0.1.0"}
+sdjournal = { path = "../sdjournal", version = "0.1.0"}
 nix = "0.10.0"
 regex = "0.2.10"
 libc = "0.2.40"
+toml = "0.4.2"
+chan-signal = "0.3.1"
