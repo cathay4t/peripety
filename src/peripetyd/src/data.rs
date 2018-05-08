@@ -25,16 +25,16 @@ pub struct ParserInfo {
 }
 
 #[derive(Clone, Debug)]
-pub struct RegexConf<'a> {
-    pub starts_with: &'a str,
+pub struct RegexConf {
+    pub starts_with: Option<String>,
     pub regex: Regex,
     pub sub_system: StorageSubSystem,
-    pub event_type: &'a str,
+    pub event_type: String,
 }
 
 #[derive(Clone, Debug)]
 pub struct RegexConfStr<'a> {
-    pub starts_with: &'a str,
+    pub starts_with: Option<&'a str>,
     pub regex: &'a str,
     pub sub_system: &'a str,
     pub event_type: &'a str,
@@ -43,10 +43,10 @@ pub struct RegexConfStr<'a> {
 impl<'a> RegexConfStr<'a> {
     pub fn to_regex_conf(&self) -> RegexConf {
         RegexConf {
-            starts_with: self.starts_with,
+            starts_with: self.starts_with.map(|s|s.to_string()),
             regex: Regex::new(self.regex).unwrap(),
             sub_system: self.sub_system.parse().unwrap(),
-            event_type: self.event_type,
+            event_type: self.event_type.to_string(),
         }
     }
 }
@@ -94,7 +94,7 @@ impl BlkInfo {
 
 pub const BUILD_IN_REGEX_CONFS: &[RegexConfStr] = &[
     RegexConfStr {
-        starts_with: "device-mapper: multipath:",
+        starts_with: Some("device-mapper: multipath:"),
         regex: r"(?x)
                 ^device-mapper:\s
                 multipath:\ Failing\ path\s
@@ -104,7 +104,7 @@ pub const BUILD_IN_REGEX_CONFS: &[RegexConfStr] = &[
         event_type: "DM_MPATH_PATH_FAILED",
     },
     RegexConfStr {
-        starts_with: "device-mapper: multipath:",
+        starts_with: Some("device-mapper: multipath:"),
         regex: r"(?x)
                 ^device-mapper:\s
                 multipath:\ Reinstating\ path\s
@@ -114,7 +114,7 @@ pub const BUILD_IN_REGEX_CONFS: &[RegexConfStr] = &[
         event_type: "DM_MPATH_PATH_REINSTATED",
     },
     RegexConfStr {
-        starts_with: "EXT4-fs ",
+        starts_with: Some("EXT4-fs "),
         regex: r"(?x)
                 ^EXT4-fs\s
                 \((?P<kdev>[^\s\)]+)\):\s
@@ -124,7 +124,7 @@ pub const BUILD_IN_REGEX_CONFS: &[RegexConfStr] = &[
         event_type: "DM_FS_MOUNTED",
     },
     RegexConfStr {
-        starts_with: "XFS ",
+        starts_with: Some("XFS "),
         regex: r"(?x)
                 ^XFS \s
                 \((?P<kdev>[^\s\)]+)\):\s
@@ -133,7 +133,7 @@ pub const BUILD_IN_REGEX_CONFS: &[RegexConfStr] = &[
         event_type: "DM_FS_MOUNTED",
     },
     RegexConfStr {
-        starts_with: "XFS ",
+        starts_with: Some("XFS "),
         regex: r"(?x)
                 ^XFS \s
                 \((?P<kdev>[^\s\)]+)\):\s
@@ -142,7 +142,7 @@ pub const BUILD_IN_REGEX_CONFS: &[RegexConfStr] = &[
         event_type: "DM_FS_IO_ERROR",
     },
     RegexConfStr {
-        starts_with: "EXT4-fs ",
+        starts_with: Some("EXT4-fs "),
         regex: r"(?x)
                 ^EXT4-fs\s
                 warning\ \(device\s
@@ -153,7 +153,7 @@ pub const BUILD_IN_REGEX_CONFS: &[RegexConfStr] = &[
         event_type: "DM_FS_IO_ERROR",
     },
     RegexConfStr {
-        starts_with: "JBD2: ",
+        starts_with: Some("JBD2: "),
         regex: r"(?x)
                 ^JBD2:\s
                 Detected\ IO\ errors\ while\ flushing\ file\ data\ on\s

@@ -16,12 +16,13 @@ use nix::sys::select::FdSet;
 use std::os::unix::io::AsRawFd;
 
 use data::{RegexConf, BUILD_IN_REGEX_CONFS};
-//use conf::PeripetydConf;
+use conf::ConfCollector;
 
 fn process_journal_entry(
     entry: &HashMap<String, String>,
     sender: &Sender<StorageEvent>,
-    regex_confs: &Vec<RegexConf>,
+    buildin_regex_confs: &Vec<RegexConf>,
+    user_regex_confs: &Vec<RegexConf>,
 ) {
     if !entry.contains_key("MESSAGE") {
         return;
@@ -58,13 +59,14 @@ fn process_journal_entry(
         event.kdev = entry.get("_KERNEL_DEVICE").unwrap().to_string();
     }
 
-    for regex_conf in regex_confs {
+    for regex_conf in buildin_regex_confs.iter().chain(user_regex_confs.iter())
+    {
         let msg = entry.get("MESSAGE").unwrap();
         // Save CPU from regex.captures() if starts_with() failed.
-        if regex_conf.starts_with.len() != 0
-            && !msg.starts_with(&regex_conf.starts_with)
-        {
-            continue;
+        if let Some(ref s) = regex_conf.starts_with {
+            if !msg.starts_with(s) {
+                continue;
+            }
         }
         if let Some(cap) = regex_conf.regex.captures(msg) {
             if let Some(m) = cap.name("kdev") {
@@ -76,12 +78,6 @@ fn process_journal_entry(
 
             if regex_conf.sub_system != StorageSubSystem::Unknown {
                 event.sub_system = regex_conf.sub_system;
-            } else if let Some(m) = cap.name("sub_system") {
-                event.sub_system = m.as_str().to_string().parse().unwrap();
-            }
-
-            if event.sub_system == StorageSubSystem::Unknown {
-                continue;
             }
 
             if regex_conf.event_type.len() != 0 {
@@ -120,7 +116,10 @@ fn process_journal_entry(
     sender.send(event).unwrap();
 }
 
-pub fn new(sender: &Sender<StorageEvent>, config_changed: &Receiver<bool>) {
+pub fn new(
+    sender: &Sender<StorageEvent>,
+    config_changed: &Receiver<ConfCollector>,
+) {
     let mut journal =
         sdjournal::Journal::new().expect("Failed to open systemd journal");
     // We never want to block, so set the timeout to 0
@@ -131,11 +130,13 @@ pub fn new(sender: &Sender<StorageEvent>, config_changed: &Receiver<bool>) {
         .expect("Unable to seek to end of journal!");
 
     // Setup initial regex conf.
-    let mut regex_confs: Vec<RegexConf> = Vec::new();
+    let mut buildin_regex_confs: Vec<RegexConf> = Vec::new();
+    let mut user_regex_confs: Vec<RegexConf> = Vec::new();
 
     // Read config to add more RegexConf.
     for regex_conf_str in BUILD_IN_REGEX_CONFS {
-        regex_confs.push(regex_conf_str.to_regex_conf());
+        let regex_conf = regex_conf_str.to_regex_conf();
+        buildin_regex_confs.push(regex_conf);
     }
 
     loop {
@@ -150,12 +151,22 @@ pub fn new(sender: &Sender<StorageEvent>, config_changed: &Receiver<bool>) {
         for entry in &mut journal {
             match entry {
                 Ok(entry) => {
-                    if let Ok(b) = config_changed.try_recv() {
-                        if b == true {
-                            println!("collector got notified on config change");
+                    if let Ok(conf) = config_changed.try_recv() {
+                        user_regex_confs.clear();
+                        for regex in conf.regexs {
+                            user_regex_confs.push(regex.to_regex_conf());
                         }
+                        println!(
+                            "Collector got regex config {:?}",
+                            user_regex_confs
+                        );
                     }
-                    process_journal_entry(&entry, sender, &regex_confs)
+                    process_journal_entry(
+                        &entry,
+                        sender,
+                        &buildin_regex_confs,
+                        &user_regex_confs,
+                    )
                 }
                 Err(e) => {
                     println!("Error retrieving the journal entry: {:?}", e)

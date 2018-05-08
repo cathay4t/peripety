@@ -8,3 +8,4 @@
  * Allow user to configure regex on kmsg plugin.
  * Expand mpath parser to include FC/FCoE/iSCSI path information.
  * Support multipathd user space logs.
+ * Support better daemon logging -- info/debug/warnning/error.

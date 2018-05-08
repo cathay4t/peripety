@@ -1,3 +1,6 @@
+#[macro_use]
+extern crate serde_derive;
+extern crate toml;
 extern crate chan_signal;
 extern crate nix;
 extern crate peripety;
@@ -10,6 +13,7 @@ mod data;
 mod scsi;
 mod fs;
 mod dm;
+mod conf;
 
 use data::{EventType, ParserInfo};
 use peripety::StorageEvent;
@@ -134,10 +138,16 @@ fn main() {
         collector::new(&collector_send, &conf_recv);
     });
 
+    if let Some(c) = conf::load_conf() {
+        conf_send.send(c.collector).unwrap();
+    }
+
     println!("Peripetyd: Ready!");
 
     loop {
         conf_changed_signal.recv().unwrap();
-        conf_send.send(true).unwrap();
+        if let Some(c) = conf::load_conf() {
+            conf_send.send(c.collector).unwrap();
+        }
     }
 }
