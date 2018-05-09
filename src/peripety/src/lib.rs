@@ -3,8 +3,33 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 use std::collections::HashMap;
-use std::str;
-use std::str::FromStr;
+use std::str::{self, FromStr};
+use std::fmt;
+
+#[derive(Debug)]
+pub enum PeripetyError {
+    LogSeverityParseError(String),
+    ConfError(String),
+    StorageSubSystemParseError(String),
+    JsonSerializeError(String),
+    JsonDeserializeError(String),
+}
+
+impl fmt::Display for PeripetyError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match *self {
+                PeripetyError::LogSeverityParseError(ref x)
+                | PeripetyError::ConfError(ref x)
+                | PeripetyError::JsonSerializeError(ref x)
+                | PeripetyError::JsonDeserializeError(ref x)
+                | PeripetyError::StorageSubSystemParseError(ref x) => x,
+            }
+        )
+    }
+}
 
 #[repr(u8)]
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
@@ -18,11 +43,12 @@ pub enum LogSeverity {
     Notice = 5,
     Info = 6,
     Debug = 7,
+    Unknown = 255,
 }
 
 impl FromStr for LogSeverity {
-    type Err = ();
-    fn from_str(s: &str) -> Result<LogSeverity, ()> {
+    type Err = PeripetyError;
+    fn from_str(s: &str) -> Result<LogSeverity, PeripetyError> {
         match s.as_ref() {
             "0" => Ok(LogSeverity::Emergency),
             "1" => Ok(LogSeverity::Alert),
@@ -32,7 +58,10 @@ impl FromStr for LogSeverity {
             "5" => Ok(LogSeverity::Notice),
             "6" => Ok(LogSeverity::Info),
             "7" => Ok(LogSeverity::Debug),
-            _ => Err(()),
+            _ => Err(PeripetyError::LogSeverityParseError(format!(
+                "Invalid severity string {}",
+                s
+            ))),
         }
     }
 }
@@ -50,8 +79,8 @@ pub enum StorageSubSystem {
 }
 
 impl FromStr for StorageSubSystem {
-    type Err = ();
-    fn from_str(s: &str) -> Result<StorageSubSystem, ()> {
+    type Err = PeripetyError;
+    fn from_str(s: &str) -> Result<StorageSubSystem, PeripetyError> {
         match s.to_uppercase().as_ref() {
             "SCSI" => Ok(StorageSubSystem::Scsi),
             "LVMTHIN" => Ok(StorageSubSystem::LvmThin),
@@ -59,7 +88,10 @@ impl FromStr for StorageSubSystem {
             "EXT4" => Ok(StorageSubSystem::FsExt4),
             "XFS" => Ok(StorageSubSystem::FsXfs),
             "NVME" => Ok(StorageSubSystem::Nvme),
-            _ => Ok(StorageSubSystem::Unknown),
+            _ => Err(PeripetyError::StorageSubSystemParseError(format!(
+                "Invalid StorageSubSystem string {}",
+                s
+            ))),
         }
     }
 }
@@ -78,7 +110,6 @@ impl std::fmt::Display for StorageSubSystem {
         }
     }
 }
-
 
 #[derive(Serialize, Deserialize, Debug, Clone, PartialEq)]
 pub struct StorageEvent {
@@ -104,7 +135,7 @@ impl Default for StorageEvent {
     fn default() -> StorageEvent {
         StorageEvent {
             hostname: String::new(),
-            severity: LogSeverity::Debug,
+            severity: LogSeverity::Unknown,
             sub_system: StorageSubSystem::Unknown,
             timestamp: 0,
             event_id: String::new(),
@@ -123,19 +154,45 @@ impl Default for StorageEvent {
 }
 
 impl StorageEvent {
-    pub fn to_json_string(&self) -> String {
-        serde_json::to_string(&self).unwrap()
+    pub fn to_json_string(&self) -> Result<String, PeripetyError> {
+        match serde_json::to_string(&self) {
+            Ok(s) => Ok(s),
+            Err(e) => Err(PeripetyError::JsonSerializeError(format!("{}", e))),
+        }
     }
-    pub fn to_json_string_pretty(&self) -> String {
-        serde_json::to_string_pretty(&self).unwrap()
+    pub fn to_json_string_pretty(&self) -> Result<String, PeripetyError> {
+        match serde_json::to_string_pretty(&self) {
+            Ok(s) => Ok(s),
+            Err(e) => Err(PeripetyError::JsonSerializeError(format!("{}", e))),
+        }
     }
-    pub fn from_json_string(json_string: &str) -> StorageEvent {
-        serde_json::from_str(json_string).unwrap()
+    pub fn from_json_string(
+        json_string: &str,
+    ) -> Result<StorageEvent, PeripetyError> {
+        match serde_json::from_str(json_string) {
+            Ok(e) => Ok(e),
+            Err(e) => {
+                Err(PeripetyError::JsonDeserializeError(format!("{}", e)))
+            }
+        }
     }
-    pub fn from_slice(buff: &[u8]) -> StorageEvent {
+    pub fn from_slice(buff: &[u8]) -> Result<StorageEvent, PeripetyError> {
         // We cannot use serde_json::from_slice, as buff might have trailing \0
         // where serde_json will raise error.
-        let tmp_s = str::from_utf8(buff).unwrap().trim_right_matches('\0');
-        serde_json::from_str(tmp_s).unwrap()
+        let tmp_s = match str::from_utf8(buff) {
+            Ok(s) => s.trim_right_matches('\0'),
+            Err(e) => {
+                return Err(PeripetyError::JsonDeserializeError(format!(
+                    "{}",
+                    e
+                )))
+            }
+        };
+        match serde_json::from_str(tmp_s) {
+            Ok(e) => Ok(e),
+            Err(e) => {
+                Err(PeripetyError::JsonDeserializeError(format!("{}", e)))
+            }
+        }
     }
 }

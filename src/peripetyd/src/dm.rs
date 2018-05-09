@@ -4,6 +4,7 @@ extern crate regex;
 use data::{BlkInfo, BlkType, Sysfs};
 use std::path::Path;
 use std::fs;
+use std::ffi::OsStr;
 
 // Support query on these formats:
 //  * dm-0
@@ -30,9 +31,22 @@ pub fn blk_info_get_dm(kdev: &str) -> Option<BlkInfo> {
             ret.blk_type = BlkType::DmMultipath;
         }
         let slave_dir = format!("/sys/block/{}/slaves", &kdev);
-        for entry in fs::read_dir(&slave_dir).unwrap() {
-            let slave = entry.unwrap().path();
-            let slave_kdev = slave.file_name().unwrap().to_str().unwrap();
+        let entries = match fs::read_dir(&slave_dir) {
+            Ok(e) => e,
+            Err(e) => {
+                println!("dm_parser: Failed to read_dir {}: {}", slave_dir, e);
+                return None;
+            }
+        };
+        for entry in entries {
+            let f = match entry {
+                Ok(e) => e.file_name(),
+                Err(_) => continue,
+            };
+            let slave_kdev = match f.to_str() {
+                Some(k) => k,
+                None => continue,
+            };
             if let Some(slave_info) = BlkInfo::new(slave_kdev) {
                 if !ret.owners_wwids.contains(&slave_info.wwid) {
                     ret.owners_wwids.push(slave_info.wwid.clone());
@@ -45,17 +59,21 @@ pub fn blk_info_get_dm(kdev: &str) -> Option<BlkInfo> {
                     || slave_info.blk_type == BlkType::DmMultipath
                 {
                     for sub_slave_blk_path in slave_info.owners_paths {
-                        let sub_slave_kdev = Path::new(&sub_slave_blk_path)
-                            .canonicalize()
-                            .unwrap();
-                        let sub_slave_kdev = sub_slave_kdev
-                            .file_name()
-                            .unwrap()
-                            .to_str()
-                            .unwrap();
+                        let sub_slave_kdev;
+                        if let Ok(p) =
+                            Path::new(&sub_slave_blk_path).canonicalize()
+                        {
+                            sub_slave_kdev =
+                                match p.file_name().and_then(OsStr::to_str) {
+                                    Some(n) => n.to_string(),
+                                    None => continue,
+                                };
+                        } else {
+                            continue;
+                        }
 
                         if let Some(sub_slave_info) =
-                            BlkInfo::new(sub_slave_kdev)
+                            BlkInfo::new(&sub_slave_kdev)
                         {
                             if !ret.owners_wwids.contains(&sub_slave_info.wwid)
                             {

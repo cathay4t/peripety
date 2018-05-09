@@ -4,7 +4,6 @@
  * Support of `/etc/peripetyd.conf`.
  * Create a AI-like root cause analyze thread.
  * Add license lines to all code files.
- * Remove all unwrap().
  * Allow user to configure regex on kmsg plugin.
  * Expand mpath parser to include FC/FCoE/iSCSI path information.
  * Support multipathd user space logs.

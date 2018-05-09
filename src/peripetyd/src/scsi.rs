@@ -21,8 +21,10 @@ pub fn blk_info_get_scsi(kdev: &str) -> Option<BlkInfo> {
     // Check if partition
     if let Ok(reg) = Regex::new("^(sd[a-z]+)([0-9]+)$") {
         if let Some(cap) = reg.captures(kdev) {
-            let name = cap.get(1).unwrap().as_str();
-            let part = cap.get(2).unwrap().as_str();
+            let name = cap.get(1).expect("BUG: blk_info_get_scsi()").as_str();
+            // We never panic as above regex is valid.
+            let part = cap.get(2).expect("BUG: blk_info_get_scsi()").as_str();
+            // We never panic as above regex is valid.
             if let Some(blk_info) = blk_info_get_scsi(&name) {
                 return Some(BlkInfo {
                     wwid: format!("{}-part{}", blk_info.wwid, part),
@@ -63,15 +65,14 @@ pub fn blk_info_get_scsi(kdev: &str) -> Option<BlkInfo> {
         });
     }
 
-    // TODO(Gris Ge): Handle partition
-
     None
 }
 
 fn pretty_wwid(wwid: &str) -> String {
     Regex::new(r"[ \t]+")
         .map(|r| r.replace_all(wwid.trim(), "-"))
-        .unwrap()
+        .expect("BUG: pretty_wwid()")
+        // we never panic as above regex string is valid.
         .to_string()
 }
 
@@ -93,7 +94,9 @@ fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {
             .extention
             .insert("scsi_id".to_string(), kdev.to_string());
 
-        sender.send(event).unwrap();
+        if let Err(e) = sender.send(event) {
+            println!("scsi_parser: Failed to send event: {}", e);
+        }
     }
 }
 
@@ -104,8 +107,10 @@ pub fn parser_start(sender: Sender<StorageEvent>) -> ParserInfo {
     let filter_event_subsys = vec![StorageSubSystem::Scsi];
 
     spawn(move || loop {
-        let event = event_in_recver.recv().unwrap();
-        parse_event(&event, &sender);
+        match event_in_recver.recv() {
+            Ok(event) => parse_event(&event, &sender),
+            Err(e) => println!("scsi_parser: Failed to receive event: {}", e),
+        }
     });
 
     ParserInfo {

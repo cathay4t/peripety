@@ -4,6 +4,7 @@ use std::fs::File;
 use std::io::Read;
 use regex::Regex;
 use data::RegexConf;
+use peripety::{PeripetyError, StorageSubSystem};
 
 static CONFIG_PATH: &'static str = "/etc/peripetyd.conf";
 
@@ -21,13 +22,31 @@ pub struct ConfCollectorRegex {
 }
 
 impl ConfCollectorRegex {
-    pub fn to_regex_conf(&self) -> RegexConf {
-        RegexConf {
+    pub fn to_regex_conf(&self) -> Result<RegexConf, PeripetyError> {
+        let regex = match Regex::new(&self.regex) {
+            Ok(r) => r,
+            Err(e) => {
+                return Err(PeripetyError::ConfError(format!(
+                    "Invalid regex: {}",
+                    e
+                )))
+            }
+        };
+        let sub_system = match self.sub_system.parse::<StorageSubSystem>() {
+            Ok(s) => s,
+            Err(e) => {
+                return Err(PeripetyError::ConfError(format!(
+                    "Invalid sub_system: {}",
+                    e
+                )))
+            }
+        };
+        Ok(RegexConf {
             starts_with: self.starts_with.clone(),
-            regex: Regex::new(&self.regex).unwrap(),
-            sub_system: self.sub_system.parse().unwrap(),
+            regex: regex,
+            sub_system: sub_system,
             event_type: self.event_type.clone(),
-        }
+        })
     }
 }
 

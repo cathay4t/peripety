@@ -101,6 +101,12 @@ impl From<std::string::FromUtf8Error> for SdJournalError {
     }
 }
 
+impl fmt::Display for SdJournalError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self)
+    }
+}
+
 // Wakeup event types
 enum SdJournalWait {
     Nop = 0,
@@ -157,13 +163,14 @@ pub fn error_string(errno: i32) -> String {
     let p = buf.as_mut_ptr();
     unsafe {
         if strerror_r(errno as c_int, p, buf.len()) < 0 {
-            panic!("strerror_r failure");
+            return format!("{}", errno);
         }
 
         let p = p as *const _;
-        std::str::from_utf8(CStr::from_ptr(p).to_bytes())
-            .unwrap()
-            .to_owned()
+        match std::str::from_utf8(CStr::from_ptr(p).to_bytes()) {
+            Ok(s) => s.to_owned(),
+            Err(_) => format!("{}", errno),
+        }
     }
 }
 
@@ -384,8 +391,7 @@ pub fn send_journal_list(
             iov_len: len,
         });
     }
-    let rc =
-        unsafe { sd_journal_sendv(iovs.as_ptr(), iovs.len() as c_int) };
+    let rc = unsafe { sd_journal_sendv(iovs.as_ptr(), iovs.len() as c_int) };
     if rc < 0 {
         return Err(SdJournalError::CError(ClibraryError::new(
             String::from("Error on sd_journal_sendv"),

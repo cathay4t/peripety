@@ -13,20 +13,43 @@ use std::ffi::CString;
 use std::ffi::CStr;
 
 fn uuid_of_blk(blk_path: &str) -> String {
-    let blk_path = Path::new(&blk_path);
-    if !blk_path.exists() {
+    let path = Path::new(&blk_path);
+    if !path.exists() {
+        println!("fs_parser: Path {} does not exists", blk_path);
         return String::new();
     }
 
-    let blk_path = blk_path.canonicalize().unwrap();
-    for entry in fs::read_dir("/dev/disk/by-uuid").unwrap() {
-        let path = entry.unwrap().path();
-        if let Ok(p) = fs::read_link(&path) {
-            let link_path =
-                format!("/dev/disk/by-uuid/{}", p.to_str().unwrap());
-            let cur_path = Path::new(&link_path).canonicalize().unwrap();
-            if cur_path == blk_path {
-                return path.file_name().unwrap().to_str().unwrap().to_string();
+    let blk_path = match path.canonicalize() {
+        Ok(b) => b,
+        Err(e) => {
+            println!(
+                "fs_parser: Failed to find canonicalize path of {}: {}",
+                blk_path, e
+            );
+            return String::new();
+        }
+    };
+    let entries = match fs::read_dir("/dev/disk/by-uuid") {
+        Ok(es) => es,
+        Err(e) => {
+            println!(
+                "fs_parser: Failed to read_dir {}: {}",
+                "/dev/disk/by-uuid", e
+            );
+            return String::new();
+        }
+    };
+    for entry in entries {
+        if let Ok(entry) = entry {
+            if let Ok(p) = fs::read_link(&entry.path()) {
+                let link_path = Path::new("/dev/disk/by-uuid/").join(p);
+                if let Ok(cur_path) = link_path.canonicalize() {
+                    if cur_path == blk_path {
+                        if let Some(s) = entry.file_name().to_str() {
+                            return s.to_string();
+                        }
+                    }
+                }
             }
         }
     }
@@ -53,7 +76,9 @@ fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {
         }
         event.owners_paths.insert(0, blk_info.blk_path);
 
-        sender.send(event).unwrap();
+        if let Err(e) = sender.send(event) {
+            println!("fs_parser: Failed to send event: {}", e);
+        }
     }
 }
 
@@ -65,8 +90,10 @@ pub fn parser_start(sender: Sender<StorageEvent>) -> ParserInfo {
         vec![StorageSubSystem::FsExt4, StorageSubSystem::FsXfs];
 
     spawn(move || loop {
-        let event = event_in_recver.recv().unwrap();
-        parse_event(&event, &sender);
+        match event_in_recver.recv() {
+            Ok(event) => parse_event(&event, &sender),
+            Err(e) => println!("fs_parser: Failed to receive event: {}", e),
+        }
     });
 
     ParserInfo {
@@ -82,9 +109,11 @@ fn get_mount_point(blk_path: &str) -> String {
     let fd = unsafe {
         libc::setmntent(
             CStr::from_bytes_with_nul(b"/proc/mounts\0")
-                .unwrap()
+                .expect("BUG: get_mount_point()")
+                // ^We never panic as it is null terminated.
                 .as_ptr(),
-            CStr::from_bytes_with_nul(b"r\0").unwrap().as_ptr(),
+            CStr::from_bytes_with_nul(b"r\0").expect("BUG").as_ptr(),
+            // ^We never panic as it is null terminated.
         )
     };
     if fd.is_null() {
@@ -93,15 +122,19 @@ fn get_mount_point(blk_path: &str) -> String {
     let mut entry = unsafe { libc::getmntent(fd) };
     while !entry.is_null() {
         let table: libc::mntent = unsafe { *entry };
-        let mnt_fsname =
-            unsafe { CStr::from_ptr(table.mnt_fsname).to_str().unwrap() };
-        if mnt_fsname == blk_path {
-            ret = unsafe {
-                CString::from_raw(table.mnt_dir).into_string().unwrap()
-            };
-            break;
+        if let Ok(mnt_fsname) =
+            unsafe { CStr::from_ptr(table.mnt_fsname).to_str() }
+        {
+            if mnt_fsname == blk_path {
+                if let Ok(s) =
+                    unsafe { CString::from_raw(table.mnt_dir).into_string() }
+                {
+                    ret = s;
+                    break;
+                }
+            }
+            entry = unsafe { libc::getmntent(fd) };
         }
-        entry = unsafe { libc::getmntent(fd) };
     }
     unsafe { libc::endmntent(fd) };
     return ret;

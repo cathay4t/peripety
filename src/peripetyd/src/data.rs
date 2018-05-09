@@ -8,7 +8,6 @@ use std::sync::mpsc::Sender;
 use peripety::{StorageEvent, StorageSubSystem};
 use std::fs;
 use std::io::Read;
-use std::ffi::OsStr;
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum EventType {
@@ -43,9 +42,18 @@ pub struct RegexConfStr<'a> {
 impl<'a> RegexConfStr<'a> {
     pub fn to_regex_conf(&self) -> RegexConf {
         RegexConf {
-            starts_with: self.starts_with.map(|s|s.to_string()),
-            regex: Regex::new(self.regex).unwrap(),
-            sub_system: self.sub_system.parse().unwrap(),
+            starts_with: self.starts_with.map(|s| s.to_string()),
+            regex: Regex::new(self.regex).expect(&format!(
+                "BUG: data.rs has invalid regex: {}",
+                self.regex
+            )),
+            // ^ We panic when hard-coded regex is not valid. It's developer's
+            // fault.
+            sub_system: self.sub_system
+                .parse()
+                .expect("BUG: data.rs has invalid sub_system"),
+            // ^ We panic when hard-coded sub_system is not valid. It's
+            // developer's fault.
             event_type: self.event_type.to_string(),
         }
     }
@@ -54,7 +62,6 @@ impl<'a> RegexConfStr<'a> {
 #[derive(Clone, PartialEq, Debug)]
 pub enum BlkType {
     Scsi,
-    Nvme,
     Dm,
     DmMultipath,
     DmLvm,
@@ -135,6 +142,15 @@ pub const BUILD_IN_REGEX_CONFS: &[RegexConfStr] = &[
     RegexConfStr {
         starts_with: Some("XFS "),
         regex: r"(?x)
+                ^XFS\s
+                \((?P<kdev>[^\s\)]+)\):\s
+                Unmounting\ Filesystem$",
+        sub_system: "xfs",
+        event_type: "DM_FS_UNMOUNTED",
+    },
+    RegexConfStr {
+        starts_with: Some("XFS "),
+        regex: r"(?x)
                 ^XFS \s
                 \((?P<kdev>[^\s\)]+)\):\s
                 writeback\ error\ on\ sector",
@@ -167,40 +183,73 @@ pub const BUILD_IN_REGEX_CONFS: &[RegexConfStr] = &[
 pub struct Sysfs;
 
 impl Sysfs {
-    pub fn major_minor_to_blk_name(major_minor: &str) -> String {
+    pub fn major_minor_to_blk_name(major_minor: &str) -> Option<String> {
         let sysfs_path = format!("/sys/dev/block/{}", major_minor);
-        if let Ok(p) = fs::read_link(sysfs_path) {
-            return p.file_name()
-                .map(|p| p.to_str().unwrap())
-                .unwrap()
-                .to_string();
-        } else {
-            panic!("Sysfs::major_minor_to_blk_name(): Failed to read link");
-        }
+        match fs::read_link(&sysfs_path) {
+            // We don't do unicode check there as this are used internally
+            // where no such non-utf8 concern.
+            Ok(p) => {
+                if let Some(p) = p.file_name() {
+                    if let Some(s) = p.to_str() {
+                        return Some(s.to_string());
+                    }
+                }
+            }
+            Err(e) => {
+                println!(
+                    "Sysfs::major_minor_to_blk_name(): \
+                     Failed to read link {}: {}",
+                    sysfs_path, e
+                );
+                return None;
+            }
+        };
+        None
     }
 
     pub fn scsi_id_to_blk_name(scsi_id: &str) -> String {
         let sysfs_path =
             format!("/sys/class/scsi_disk/{}/device/block", scsi_id);
-        let mut blks = fs::read_dir(&sysfs_path).unwrap();
+        let mut blks = match fs::read_dir(&sysfs_path) {
+            Ok(b) => b,
+            Err(e) => {
+                println!(
+                    "Sysfs::scsi_id_to_blk_name(): Failed to read_dir {}: {}",
+                    sysfs_path, e
+                );
+                return String::new();
+            }
+        };
         if let Some(Ok(blk)) = blks.next() {
-            return blk.path()
-                .file_name()
-                .and_then(OsStr::to_str)
-                .unwrap()
-                .to_string();
+            // Assuming sysfs are all utf8 filenames for block layer.
+            if let Some(n) = blk.path().file_name() {
+                if let Some(s) = n.to_str() {
+                    return s.to_string();
+                }
+            }
         }
 
         String::new()
     }
 
     pub fn read(path: &str) -> String {
-        let mut fd = fs::File::open(path).unwrap();
         let mut contents = String::new();
-        fd.read_to_string(&mut contents).unwrap();
-        if contents.ends_with("\n") {
-            contents.pop();
-        }
+        match fs::File::open(path) {
+            Ok(mut fd) => {
+                if let Err(e) = fd.read_to_string(&mut contents) {
+                    println!(
+                        "Sysfs::read(): Failed to read file {}: {}",
+                        path, e
+                    );
+                }
+                if contents.ends_with("\n") {
+                    contents.pop();
+                }
+            }
+            Err(e) => {
+                println!("Sysfs::read(): Failed to read file {}: {}", path, e);
+            }
+        };
         contents
     }
 }
