@@ -82,17 +82,29 @@ pub struct BlkInfo {
 
 impl BlkInfo {
     pub fn new(kdev: &str) -> Option<BlkInfo> {
-        if kdev.starts_with("dm") {
+        // dm-0
+        if kdev.starts_with("dm-") {
             return dm::blk_info_get_dm(kdev);
         }
 
+        // sdb
         if kdev.starts_with("sd") {
             return scsi::blk_info_get_scsi(kdev);
         }
 
+        // scsi_id: 4:0:1:1
         if let Ok(reg) = Regex::new(r"^(:?[0-9]+:){3}[0-9]+$") {
             if reg.is_match(kdev) {
                 return scsi::blk_info_get_scsi(kdev);
+            }
+        }
+
+        // major: minor
+        if let Ok(reg) = Regex::new(r"^[0-9]+:[0-9]+$") {
+            if reg.is_match(kdev) {
+                if let Some(n) = Sysfs::major_minor_to_blk_name(kdev) {
+                    return BlkInfo::new(&n);
+                }
             }
         }
         None
@@ -230,6 +242,29 @@ impl Sysfs {
         }
 
         String::new()
+    }
+
+    pub fn scsi_host_id_of_disk(name: &str) -> Option<String> {
+        let sysfs_path = format!("/sys/block/{}/device", name);
+        match fs::read_link(&sysfs_path) {
+            Ok(p) => {
+                if let Some(p) = p.file_name() {
+                    if let Some(s) = p.to_str() {
+                        if let Some(index) = s.find(":") {
+                            return Some(s[..index].to_string());
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                println!(
+                    "Sysfs::scsi_host_id_of_disk(): Failed to read link {}: {}",
+                    sysfs_path, e
+                );
+                return None;
+            }
+        };
+        None
     }
 
     pub fn read(path: &str) -> String {
