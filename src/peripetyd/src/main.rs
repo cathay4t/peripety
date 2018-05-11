@@ -31,7 +31,7 @@ fn send_to_journald(event: &StorageEvent) {
         "PRIORITY".to_string(),
         format!("{}", event.severity as u8),
     ));
-    logs.push(("MESSAGE".to_string(), event.msg.clone()));
+    logs.push(("RAW_MESSAGE".to_string(), event.msg.clone()));
     logs.push(("DEV_WWID".to_string(), event.dev_wwid.clone()));
     logs.push(("DEV_NAME".to_string(), event.dev_name.clone()));
     logs.push(("DEV_PATH".to_string(), event.dev_path.clone()));
