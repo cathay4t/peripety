@@ -1,0 +1,31 @@
+{
+  "hostname": "storageqe-18.rhts.eng.bos.redhat.com",
+  "severity": "Warning",
+  "sub_system": "Multipath",
+  "timestamp": 1526053021631595,
+  "event_id": "",
+  "event_type": "DM_MPATH_PATH_FAILED",
+  "dev_wwid": "360a98000324669436c2b45666c567946",
+  "dev_name": "360a98000324669436c2b45666c567946",
+  "dev_path": "/dev/mapper/360a98000324669436c2b45666c567946",
+  "owners_wwids": [
+    "t10.NETAPP-LUN-2FiCl+EflVyF"
+  ],
+  "owners_names": [
+    "sdd"
+  ],
+  "owners_paths": [
+    "/dev/sdd"
+  ],
+  "kdev": "8:48",
+  "msg": "device-mapper: multipath: Failing path 8:48.",
+  "extention": {
+    "blk_major_minor": "8:48",
+    "transport": "FC",
+    "port_state": "Online",
+    "target_wwpn": "0x500a0982891b8dc5",
+    "host_wwpn": "0x10000000c9a02834",
+    "speed": "8 Gbit",
+    "driver_name": "lpfc"
+  }
+}
