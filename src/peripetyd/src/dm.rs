@@ -2,9 +2,9 @@ extern crate peripety;
 extern crate regex;
 
 use data::{BlkInfo, BlkType, Sysfs};
-use std::path::Path;
-use std::fs;
 use std::ffi::OsStr;
+use std::fs;
+use std::path::Path;
 
 // Support query on these formats:
 //  * dm-0
@@ -34,7 +34,10 @@ pub fn blk_info_get_dm(kdev: &str) -> Option<BlkInfo> {
         let entries = match fs::read_dir(&slave_dir) {
             Ok(e) => e,
             Err(e) => {
-                println!("dm_parser: Failed to read_dir {}: {}", slave_dir, e);
+                println!(
+                    "dm_parser: Failed to read_dir {}: {}",
+                    slave_dir, e
+                );
                 return None;
             }
         };
@@ -50,9 +53,11 @@ pub fn blk_info_get_dm(kdev: &str) -> Option<BlkInfo> {
             if let Some(slave_info) = BlkInfo::new(slave_kdev) {
                 if !ret.owners_wwids.contains(&slave_info.wwid) {
                     ret.owners_wwids.push(slave_info.wwid.clone());
-                    ret.owners_types.push(slave_info.blk_type.clone());
+                    ret.owners_types
+                        .push(slave_info.blk_type.clone());
                     ret.owners_names.push(slave_info.name.clone());
-                    ret.owners_paths.push(slave_info.blk_path.clone());
+                    ret.owners_paths
+                        .push(slave_info.blk_path.clone());
                 }
                 if slave_info.blk_type == BlkType::DmLvm
                     || slave_info.blk_type == BlkType::Dm

@@ -9,14 +9,14 @@ extern crate sdjournal;
 // https://github.com/tasleson/storage_event_monitor/blob/master/src/main.rs
 // Which is MPL license.
 
-use std::sync::mpsc::{Receiver, Sender};
+use nix::sys::select::FdSet;
 use peripety::{LogSeverity, StorageEvent, StorageSubSystem};
 use std::collections::HashMap;
-use nix::sys::select::FdSet;
 use std::os::unix::io::AsRawFd;
+use std::sync::mpsc::{Receiver, Sender};
 
-use data::{RegexConf, BUILD_IN_REGEX_CONFS};
 use conf::ConfCollector;
+use data::{RegexConf, BUILD_IN_REGEX_CONFS};
 
 fn process_journal_entry(
     entry: &HashMap<String, String>,
@@ -66,7 +66,9 @@ fn process_journal_entry(
         event.kdev = d.to_string();
     }
 
-    for regex_conf in buildin_regex_confs.iter().chain(user_regex_confs.iter())
+    for regex_conf in buildin_regex_confs
+        .iter()
+        .chain(user_regex_confs.iter())
     {
         // Save CPU from regex.captures() if starts_with() failed.
         if let Some(ref s) = regex_conf.starts_with {
@@ -156,7 +158,10 @@ pub fn new(
         if let Err(e) =
             nix::sys::select::select(None, Some(&mut fds), None, None, None)
         {
-            println!("collector: Failed select against journal fd: {}", e);
+            println!(
+                "collector: Failed select against journal fd: {}",
+                e
+            );
             continue;
         }
         if !fds.contains(journal.as_raw_fd()) {

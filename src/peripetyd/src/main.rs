@@ -8,25 +8,29 @@ extern crate serde_derive;
 extern crate toml;
 
 mod collector;
-mod mpath;
-mod data;
-mod scsi;
-mod fs;
-mod dm;
 mod conf;
+mod data;
+mod dm;
+mod fs;
+mod mpath;
+mod scsi;
 
+use chan_signal::Signal;
+use conf::ConfMain;
 use data::{EventType, ParserInfo};
 use peripety::StorageEvent;
-use std::thread::{sleep, Builder};
-use std::time::Duration;
 use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
-use chan_signal::Signal;
+use std::thread::{sleep, Builder};
+use std::time::Duration;
 
 fn send_to_journald(event: &StorageEvent) {
     let mut logs = Vec::new();
     logs.push(("IS_PERIPETY".to_string(), "TRUE".to_string()));
-    logs.push(("PRIORITY".to_string(), format!("{}", event.severity as u8)));
+    logs.push((
+        "PRIORITY".to_string(),
+        format!("{}", event.severity as u8),
+    ));
     logs.push(("MESSAGE".to_string(), event.msg.clone()));
     logs.push(("DEV_WWID".to_string(), event.dev_wwid.clone()));
     logs.push(("DEV_NAME".to_string(), event.dev_name.clone()));
@@ -41,11 +45,20 @@ fn send_to_journald(event: &StorageEvent) {
         logs.push(("OWNERS_PATHS".to_string(), owners_path.clone()));
     }
     for (key, value) in &event.extention {
-        logs.push((format!("EXT_{}", key.to_uppercase()), value.clone()));
+        logs.push((
+            format!("EXT_{}", key.to_uppercase()),
+            value.clone(),
+        ));
     }
-    logs.push(("EVENT_TYPE".to_string(), event.event_type.clone()));
+    logs.push((
+        "EVENT_TYPE".to_string(),
+        event.event_type.clone(),
+    ));
     logs.push(("EVENT_ID".to_string(), event.event_id.clone()));
-    logs.push(("SUB_SYSTEM".to_string(), event.sub_system.to_string()));
+    logs.push((
+        "SUB_SYSTEM".to_string(),
+        event.sub_system.to_string(),
+    ));
     if let Err(e) = sdjournal::send_journal_list(&logs) {
         println!("Failed to save event to journald: {}", e);
     }
@@ -54,7 +67,14 @@ fn send_to_journald(event: &StorageEvent) {
 fn handle_events_from_parsers(
     recver: &Receiver<StorageEvent>,
     parsers: &Vec<ParserInfo>,
+    daemon_conf: Option<ConfMain>,
 ) {
+    let mut skip_stdout = false;
+    if let Some(c) = daemon_conf {
+        if c.notify_stdout == Some(false) {
+            skip_stdout = true;
+        }
+    }
     loop {
         let event = match recver.recv() {
             Ok(e) => e,
@@ -64,10 +84,12 @@ fn handle_events_from_parsers(
             }
         };
 
-        if let Ok(s) = event.to_json_string_pretty() {
-            println!("{}", s);
-        }
         // Send to stdout
+        if !skip_stdout {
+            if let Ok(s) = event.to_json_string_pretty() {
+                println!("{}", s);
+            }
+        }
 
         // Send to journald.
         // TODO(Gris Ge): Invoke a thread of this in case sdjournal slows us.
@@ -87,7 +109,10 @@ fn handle_events_from_parsers(
             };
             if required {
                 if let Err(e) = parser.sender.send(event.clone()) {
-                    println!("Failed to send synthetic event to parser: {}", e);
+                    println!(
+                        "Failed to send synthetic event to parser: {}",
+                        e
+                    );
                 }
             }
         }
@@ -136,6 +161,13 @@ fn main() {
     let (conf_send, conf_recv) = mpsc::channel();
     let mut parsers: Vec<ParserInfo> = Vec::new();
 
+    let mut daemon_conf = None;
+    let mut collector_conf = None;
+    if let Some(c) = conf::load_conf() {
+        daemon_conf = Some(c.main);
+        collector_conf = Some(c.collector);
+    }
+
     let conf_changed_signal = chan_signal::notify(&[Signal::HUP]);
 
     // 1. Start parser threads
@@ -157,7 +189,11 @@ fn main() {
     Builder::new()
         .name("handle_events_from_parsers".into())
         .spawn(move || {
-            handle_events_from_parsers(&notifier_recv, &parsers_clone);
+            handle_events_from_parsers(
+                &notifier_recv,
+                &parsers_clone,
+                daemon_conf,
+            );
         })
         .expect("Failed to start 'handle_events_from_parsers' thread");
 
@@ -172,9 +208,9 @@ fn main() {
         })
         .expect("Failed to start 'collector' thread");
 
-    if let Some(c) = conf::load_conf() {
+    if let Some(c) = collector_conf {
         conf_send
-            .send(c.collector)
+            .send(c)
             .expect("Failed to send config to collector");
     }
 

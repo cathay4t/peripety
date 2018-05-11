@@ -4,12 +4,12 @@ extern crate regex;
 //mod data;
 
 use data::{BlkInfo, BlkType, EventType, ParserInfo, Sysfs};
+use peripety::{StorageEvent, StorageSubSystem};
+use regex::Regex;
+use std::path::Path;
 use std::sync::mpsc;
 use std::sync::mpsc::Sender;
-use peripety::{StorageEvent, StorageSubSystem};
 use std::thread::spawn;
-use std::path::Path;
-use regex::Regex;
 
 // Support query on these formats:
 //  * 4:0:0:1
@@ -21,9 +21,13 @@ pub fn blk_info_get_scsi(kdev: &str) -> Option<BlkInfo> {
     // Check if partition
     if let Ok(reg) = Regex::new("^(sd[a-z]+)([0-9]+)$") {
         if let Some(cap) = reg.captures(kdev) {
-            let name = cap.get(1).expect("BUG: blk_info_get_scsi()").as_str();
+            let name = cap.get(1)
+                .expect("BUG: blk_info_get_scsi()")
+                .as_str();
             // We never panic as above regex is valid.
-            let part = cap.get(2).expect("BUG: blk_info_get_scsi()").as_str();
+            let part = cap.get(2)
+                .expect("BUG: blk_info_get_scsi()")
+                .as_str();
             // We never panic as above regex is valid.
             if let Some(blk_info) = blk_info_get_scsi(&name) {
                 return Some(BlkInfo {

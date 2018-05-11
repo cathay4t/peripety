@@ -1,13 +1,13 @@
 extern crate peripety;
 extern crate regex;
 
-use scsi;
 use dm;
-use regex::Regex;
-use std::sync::mpsc::Sender;
 use peripety::{StorageEvent, StorageSubSystem};
+use regex::Regex;
+use scsi;
 use std::fs;
 use std::io::Read;
+use std::sync::mpsc::Sender;
 
 #[derive(PartialEq, Clone, Debug)]
 pub enum EventType {
@@ -244,15 +244,13 @@ impl Sysfs {
         String::new()
     }
 
-    pub fn scsi_host_id_of_disk(name: &str) -> Option<String> {
+    pub fn scsi_id_of_disk(name: &str) -> Option<String> {
         let sysfs_path = format!("/sys/block/{}/device", name);
         match fs::read_link(&sysfs_path) {
             Ok(p) => {
                 if let Some(p) = p.file_name() {
                     if let Some(s) = p.to_str() {
-                        if let Some(index) = s.find(":") {
-                            return Some(s[..index].to_string());
-                        }
+                        return Some(s.to_string());
                     }
                 }
             }
@@ -264,6 +262,14 @@ impl Sysfs {
                 return None;
             }
         };
+        None
+    }
+
+    pub fn scsi_host_id_of_scsi_id(scsi_id: &str) -> Option<String> {
+        if let Some(index) = scsi_id.find(":") {
+            return Some(scsi_id[..index].to_string());
+        }
+
         None
     }
 
@@ -282,7 +288,10 @@ impl Sysfs {
                 }
             }
             Err(e) => {
-                println!("Sysfs::read(): Failed to read file {}: {}", path, e);
+                println!(
+                    "Sysfs::read(): Failed to read file {}: {}",
+                    path, e
+                );
             }
         };
         contents

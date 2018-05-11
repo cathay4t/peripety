@@ -1,12 +1,12 @@
 use data::{BlkInfo, BlkType, EventType, ParserInfo, Sysfs};
+use peripety::{StorageEvent, StorageSubSystem};
+use regex::Regex;
+use std::collections::HashMap;
+use std::fs;
+use std::path::Path;
 use std::sync::mpsc;
 use std::sync::mpsc::Sender;
-use peripety::{StorageEvent, StorageSubSystem};
 use std::thread::Builder;
-use std::fs;
-use std::collections::HashMap;
-use regex::Regex;
-use std::path::Path;
 
 //TODO(Gris Ge): Maybe we should be save iscsi/fc data into BlkInfo::new().
 fn iscsi_session_id_of_host(host_id: &str) -> Option<String> {
@@ -20,7 +20,10 @@ fn iscsi_session_id_of_host(host_id: &str) -> Option<String> {
             }
         },
         Err(e) => {
-            println!("mpath_parser: Error when read_link {}: {}", path, e);
+            println!(
+                "mpath_parser: Error when read_link {}: {}",
+                path, e
+            );
             return None;
         }
     };
@@ -38,7 +41,10 @@ fn iscsi_session_id_of_host(host_id: &str) -> Option<String> {
             }
         }
         None => {
-            println!("mpath_parser: Failed to do regex parsing on {}", p);
+            println!(
+                "mpath_parser: Failed to do regex parsing on {}",
+                p
+            );
             return None;
         }
     };
@@ -46,7 +52,10 @@ fn iscsi_session_id_of_host(host_id: &str) -> Option<String> {
     let dir_entries = match fs::read_dir(&dev_path) {
         Ok(b) => b,
         Err(e) => {
-            println!("mpath_parser: Failed to read_dir {}: {}", dev_path, e);
+            println!(
+                "mpath_parser: Failed to read_dir {}: {}",
+                dev_path, e
+            );
             return None;
         }
     };
@@ -62,12 +71,14 @@ fn iscsi_session_id_of_host(host_id: &str) -> Option<String> {
     None
 }
 
-fn get_iscsi_host_info(host_id: &str) -> HashMap<String, String> {
+fn get_iscsi_info(host_id: &str) -> HashMap<String, String> {
     let mut ret = HashMap::new();
     if let Some(sid) = iscsi_session_id_of_host(host_id) {
         let session_dir = format!("/sys/class/iscsi_session/session{}", sid);
-        let conn_dir =
-            format!("/sys/class/iscsi_connection/connection{}:0", sid);
+        let conn_dir = format!(
+            "/sys/class/iscsi_connection/connection{}:0",
+            sid
+        );
         if !Path::new(&session_dir).exists() {
             return ret;
         }
@@ -99,26 +110,58 @@ fn get_iscsi_host_info(host_id: &str) -> HashMap<String, String> {
     ret
 }
 
-fn fc_host_id_of_host(host_id: &str) -> Option<String> {
-    None
-}
+fn get_fc_info(host_id: &str, scsi_id: &str) -> HashMap<String, String> {
+    let mut ret = HashMap::new();
+    // fc-hosts are using the same host id with scsi host.
+    if let Some(index) = scsi_id.rfind(":") {
+        let target_id = &scsi_id[..index];
+        let target_dir = format!("/sys/class/fc_transport/target{}", target_id);
+        let host_dir = format!("/sys/class/fc_host/host{}", host_id);
+        if !Path::new(&host_dir).exists() {
+            return ret;
+        }
+        if !Path::new(&target_dir).exists() {
+            return ret;
+        }
+        ret.insert(
+            "target_wwpn".to_string(),
+            Sysfs::read(&format!("{}/{}", target_dir, "port_name")),
+        );
+        ret.insert(
+            "host_wwpn".to_string(),
+            Sysfs::read(&format!("{}/{}", host_dir, "port_name")),
+        );
+        ret.insert(
+            "speed".to_string(),
+            Sysfs::read(&format!("{}/{}", host_dir, "speed")),
+        );
+        ret.insert(
+            "port_state".to_string(),
+            Sysfs::read(&format!("{}/{}", host_dir, "port_state")),
+        );
+    }
 
-fn get_fc_host_info(host_id: &str) -> HashMap<String, String> {
-    let ret = HashMap::new();
     ret
 }
 
 fn is_iscsi_host(host_id: &str) -> bool {
-    Path::new(&format!("/sys/class/iscsi_host/host{}", host_id)).exists()
+    Path::new(&format!(
+        "/sys/class/iscsi_host/host{}",
+        host_id
+    )).exists()
 }
 
 fn is_fc_host(host_id: &str) -> bool {
     Path::new(&format!("/sys/class/fc_host/host{}", host_id)).exists()
 }
 
-fn get_scsi_host_info(blk_name: &str) -> HashMap<String, String> {
+fn get_transport_info(blk_name: &str) -> HashMap<String, String> {
     let mut ret = HashMap::new();
-    let host_id = match Sysfs::scsi_host_id_of_disk(blk_name) {
+    let scsi_id = match Sysfs::scsi_id_of_disk(blk_name) {
+        Some(s) => s,
+        None => return ret,
+    };
+    let host_id = match Sysfs::scsi_host_id_of_scsi_id(&scsi_id) {
         Some(h) => h,
         None => return ret,
     };
@@ -131,12 +174,12 @@ fn get_scsi_host_info(blk_name: &str) -> HashMap<String, String> {
     );
     if is_iscsi_host(&host_id) {
         ret.insert("transport".to_string(), "iSCSI".to_string());
-        for (key, value) in get_iscsi_host_info(&host_id) {
+        for (key, value) in get_iscsi_info(&host_id) {
             ret.insert(key, value);
         }
     } else if is_fc_host(&host_id) {
         ret.insert("transport".to_string(), "FC".to_string());
-        for (key, value) in get_fc_host_info(&host_id) {
+        for (key, value) in get_fc_info(&host_id, &scsi_id) {
             ret.insert(key, value);
         }
     }
@@ -202,22 +245,28 @@ fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {
             if let Some(blk_info) = BlkInfo::new(&event.kdev) {
                 event.owners_wwids.push(blk_info.wwid.clone());
                 event.owners_names.push(blk_info.name.clone());
-                event.owners_paths.push(blk_info.blk_path.clone());
+                event
+                    .owners_paths
+                    .push(blk_info.blk_path.clone());
                 if blk_info.blk_type == BlkType::Scsi {
                     // Check for iSCSI/FC/FCoE informations.
-                    for (key, value) in get_scsi_host_info(&blk_info.name) {
+                    for (key, value) in get_transport_info(&blk_info.name) {
                         event.extention.insert(key, value);
                     }
                 }
             }
-            event
-                .extention
-                .insert("blk_major_minor".to_string(), event.kdev.clone());
+            event.extention.insert(
+                "blk_major_minor".to_string(),
+                event.kdev.clone(),
+            );
             if let Err(e) = sender.send(event) {
                 println!("mpath_parser: Failed to send event: {}", e);
             }
         }
-        _ => println!("mpath: Got unknown event type: {}", event.event_type),
+        _ => println!(
+            "mpath: Got unknown event type: {}",
+            event.event_type
+        ),
     };
 }
 
@@ -227,17 +276,20 @@ pub fn parser_start(sender: Sender<StorageEvent>) -> ParserInfo {
     let filter_event_type = vec![EventType::Raw];
     let filter_event_subsys = vec![StorageSubSystem::Multipath];
 
-    if let Err(e) = Builder::new().name("mpath_parser".into()).spawn(
-        move || loop {
+    if let Err(e) = Builder::new()
+        .name("mpath_parser".into())
+        .spawn(move || loop {
             match event_in_recver.recv() {
                 Ok(event) => parse_event(&event, &sender),
                 Err(e) => {
                     println!("mpath_parser: Failed to retrieve event: {}", e)
                 }
             };
-        },
-    ) {
-        panic!("mpath_parser: Failed to create parser thread: {}", e);
+        }) {
+        panic!(
+            "mpath_parser: Failed to create parser thread: {}",
+            e
+        );
     }
 
     println!("mpath_parser: Ready");

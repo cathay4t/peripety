@@ -1,16 +1,17 @@
-use toml;
-use std::path::Path;
-use std::fs::File;
-use std::io::Read;
-use regex::Regex;
 use data::RegexConf;
 use peripety::{PeripetyError, StorageSubSystem};
+use regex::Regex;
+use std::fs::File;
+use std::io::Read;
+use std::path::Path;
+use toml;
 
 static CONFIG_PATH: &'static str = "/etc/peripetyd.conf";
 
 #[derive(Deserialize, Debug)]
 pub struct ConfMain {
     pub notify_stdout: Option<bool>,
+    pub save_to_journald: Option<bool>,
 }
 
 #[derive(Deserialize, Debug)]
@@ -71,20 +72,29 @@ pub fn load_conf() -> Option<Conf> {
     let mut fd = match File::open(path) {
         Ok(fd) => fd,
         Err(e) => {
-            println!("Failed to open config file {}, error {}", CONFIG_PATH, e);
+            println!(
+                "Failed to open config file {}, error {}",
+                CONFIG_PATH, e
+            );
             return None;
         }
     };
     let mut contents = String::new();
     if let Err(e) = fd.read_to_string(&mut contents) {
-        println!("Fail to read config file {}, error {}", CONFIG_PATH, e);
+        println!(
+            "Fail to read config file {}, error {}",
+            CONFIG_PATH, e
+        );
         return None;
     }
 
     match toml::from_str(&contents) {
         Ok(c) => Some(c),
         Err(e) => {
-            println!("Fail to parse config file {}, error {}", CONFIG_PATH, e);
+            println!(
+                "Fail to parse config file {}, error {}",
+                CONFIG_PATH, e
+            );
             None
         }
     }

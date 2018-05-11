@@ -3,14 +3,14 @@ extern crate peripety;
 extern crate regex;
 
 use data::{BlkInfo, EventType, ParserInfo};
-use std::sync::mpsc;
-use std::sync::mpsc::Sender;
 use peripety::{StorageEvent, StorageSubSystem};
-use std::thread::spawn;
+use std::ffi::CStr;
+use std::ffi::CString;
 use std::fs;
 use std::path::Path;
-use std::ffi::CString;
-use std::ffi::CStr;
+use std::sync::mpsc;
+use std::sync::mpsc::Sender;
+use std::thread::spawn;
 
 fn uuid_of_blk(blk_path: &str) -> String {
     let path = Path::new(&blk_path);
@@ -72,7 +72,9 @@ fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {
         event.owners_names.insert(0, blk_info.name);
         let mnt_pnt = get_mount_point(&blk_info.blk_path);
         if mnt_pnt.len() != 0 {
-            event.extention.insert("mount_point".to_string(), mnt_pnt);
+            event
+                .extention
+                .insert("mount_point".to_string(), mnt_pnt);
         }
         event.owners_paths.insert(0, blk_info.blk_path);
 
@@ -86,8 +88,10 @@ pub fn parser_start(sender: Sender<StorageEvent>) -> ParserInfo {
     let (event_in_sender, event_in_recver) = mpsc::channel();
     let name = "fs".to_string();
     let filter_event_type = vec![EventType::Raw];
-    let filter_event_subsys =
-        vec![StorageSubSystem::FsExt4, StorageSubSystem::FsXfs];
+    let filter_event_subsys = vec![
+        StorageSubSystem::FsExt4,
+        StorageSubSystem::FsXfs,
+    ];
 
     spawn(move || loop {
         match event_in_recver.recv() {
@@ -112,7 +116,9 @@ fn get_mount_point(blk_path: &str) -> String {
                 .expect("BUG: get_mount_point()")
                 // ^We never panic as it is null terminated.
                 .as_ptr(),
-            CStr::from_bytes_with_nul(b"r\0").expect("BUG").as_ptr(),
+            CStr::from_bytes_with_nul(b"r\0")
+                .expect("BUG")
+                .as_ptr(),
             // ^We never panic as it is null terminated.
         )
     };
