@@ -1,0 +1,32 @@
+{
+  "hostname": "Gris-Laptop",
+  "severity": "Info",
+  "sub_system": "FsExt4",
+  "timestamp": 1526476997012691,
+  "event_id": "",
+  "event_type": "DM_FS_MOUNTED",
+  "dev_wwid": "47841ee5-047d-4f73-8951-5a3d7a4c770e",
+  "dev_path": "/dev/mapper/vg-lv",
+  "owners_wwids": [
+    "LVM-jM0Tz8T6xqZjS5NF1SQB2A35zYk80ayyNqp0YXhWtL4uJD7Ou9HKT4wcHRXwVLIj",
+    "mpath-333333330000007d0",
+    "t10.Linux-scsi_debug-2000"
+  ],
+  "owners_paths": [
+    "/dev/mapper/vg-lv",
+    "/dev/mapper/mpatha",
+    "/dev/sdf",
+    "/dev/sdd",
+    "/dev/sdb",
+    "/dev/sdi",
+    "/dev/sdg",
+    "/dev/sde",
+    "/dev/sdc",
+    "/dev/sdh"
+  ],
+  "kdev": "dm-1",
+  "msg": "EXT4-fs (dm-1): mounted filesystem with ordered data mode. Opts: (null)",
+  "extention": {
+    "mount_point": "/tmp/tmp.MYo8MCHF35"
+  }
+}

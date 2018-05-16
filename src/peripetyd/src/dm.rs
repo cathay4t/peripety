@@ -19,10 +19,8 @@ pub fn blk_info_get_dm(kdev: &str) -> Option<BlkInfo> {
             wwid: Sysfs::read(&sysfs_uuid),
             blk_type: BlkType::Dm,
             blk_path: format!("/dev/mapper/{}", &name),
-            name: name,
             owners_wwids: Vec::new(),
             owners_types: Vec::new(),
-            owners_names: Vec::new(),
             owners_paths: Vec::new(),
         };
         if ret.wwid.starts_with("LVM-") {
@@ -55,7 +53,8 @@ pub fn blk_info_get_dm(kdev: &str) -> Option<BlkInfo> {
                     ret.owners_wwids.push(slave_info.wwid.clone());
                     ret.owners_types
                         .push(slave_info.blk_type.clone());
-                    ret.owners_names.push(slave_info.name.clone());
+                }
+                if !ret.owners_paths.contains(&slave_info.blk_path) {
                     ret.owners_paths
                         .push(slave_info.blk_path.clone());
                 }
@@ -84,7 +83,10 @@ pub fn blk_info_get_dm(kdev: &str) -> Option<BlkInfo> {
                             {
                                 ret.owners_wwids.push(sub_slave_info.wwid);
                                 ret.owners_types.push(sub_slave_info.blk_type);
-                                ret.owners_names.push(sub_slave_info.name);
+                            }
+                            if !ret.owners_paths
+                                .contains(&sub_slave_info.blk_path)
+                            {
                                 ret.owners_paths.push(sub_slave_info.blk_path);
                             }
                         }

@@ -33,13 +33,9 @@ fn send_to_journald(event: &StorageEvent) {
     ));
     logs.push(("RAW_MESSAGE".to_string(), event.msg.clone()));
     logs.push(("DEV_WWID".to_string(), event.dev_wwid.clone()));
-    logs.push(("DEV_NAME".to_string(), event.dev_name.clone()));
     logs.push(("DEV_PATH".to_string(), event.dev_path.clone()));
     for owners_wwid in &event.owners_wwids {
         logs.push(("OWNERS_WWIDS".to_string(), owners_wwid.clone()));
-    }
-    for owners_name in &event.owners_names {
-        logs.push(("OWNERS_NAMES".to_string(), owners_name.clone()));
     }
     for owners_path in &event.owners_paths {
         logs.push(("OWNERS_PATHS".to_string(), owners_path.clone()));

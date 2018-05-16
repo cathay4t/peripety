@@ -8,6 +8,29 @@ use std::sync::mpsc;
 use std::sync::mpsc::Sender;
 use std::thread::Builder;
 
+fn get_dm_name(dev_path: &str) -> Option<String> {
+    match fs::read_link(dev_path) {
+        // We don't do unicode check there as this are used internally
+        // where no such non-utf8 concern.
+        Ok(p) => {
+            if let Some(p) = p.file_name() {
+                if let Some(s) = p.to_str() {
+                    return Some(s.to_string());
+                }
+            }
+        }
+        Err(e) => {
+            println!(
+                "mpath_parser::get_dm_name(): \
+                 Failed to read link {}: {}",
+                dev_path, e
+            );
+            return None;
+        }
+    };
+    None
+}
+
 //TODO(Gris Ge): Maybe we should be save iscsi/fc data into BlkInfo::new().
 fn iscsi_session_id_of_host(host_id: &str) -> Option<String> {
     let path = format!("/sys/class/iscsi_host/host{}", host_id);
@@ -155,8 +178,18 @@ fn is_fc_host(host_id: &str) -> bool {
     Path::new(&format!("/sys/class/fc_host/host{}", host_id)).exists()
 }
 
-fn get_transport_info(blk_name: &str) -> HashMap<String, String> {
+fn base_name(blk_path: &str) -> String {
+    Path::new(blk_path)
+        .file_name()
+        .expect("BUG: mpath_parser: base_name()")
+        .to_str()
+        .expect("BUG: mpath_parser: base_name()")
+        .to_string()
+}
+
+fn get_transport_info(blk_path: &str) -> HashMap<String, String> {
     let mut ret = HashMap::new();
+    let blk_name = &base_name(blk_path);
     let scsi_id = match Sysfs::scsi_id_of_disk(blk_name) {
         Some(s) => s,
         None => return ret,
@@ -240,17 +273,23 @@ fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {
             };
             let mut event = event.clone();
             event.dev_path = format!("/dev/mapper/{}", name);
-            event.dev_name = name;
             event.dev_wwid = uuid;
-            if let Some(blk_info) = BlkInfo::new(&event.kdev) {
-                event.owners_wwids.push(blk_info.wwid.clone());
-                event.owners_names.push(blk_info.name.clone());
-                event
-                    .owners_paths
-                    .push(blk_info.blk_path.clone());
+            let dm_name = match get_dm_name(&event.dev_path) {
+                Some(d) => d,
+                None => {
+                    println!(
+                        "mpath_parser: Failed to find dm_name for {}",
+                        &event.dev_path
+                    );
+                    return;
+                }
+            };
+            if let Some(blk_info) = BlkInfo::new(&dm_name) {
+                event.owners_wwids = blk_info.owners_wwids;
+                event.owners_paths = blk_info.owners_paths;
                 if blk_info.blk_type == BlkType::Scsi {
                     // Check for iSCSI/FC/FCoE informations.
-                    for (key, value) in get_transport_info(&blk_info.name) {
+                    for (key, value) in get_transport_info(&blk_info.blk_path) {
                         event.extention.insert(key, value);
                     }
                 }

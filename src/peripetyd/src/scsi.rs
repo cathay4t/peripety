@@ -34,10 +34,8 @@ pub fn blk_info_get_scsi(kdev: &str) -> Option<BlkInfo> {
                     wwid: format!("{}-part{}", blk_info.wwid, part),
                     blk_type: BlkType::Partition,
                     blk_path: format!("/dev/{}", &kdev),
-                    name: kdev.to_string(),
                     owners_wwids: vec![blk_info.wwid],
                     owners_types: vec![BlkType::Scsi],
-                    owners_names: vec![blk_info.name],
                     owners_paths: vec![blk_info.blk_path],
                 });
             } else {
@@ -61,10 +59,8 @@ pub fn blk_info_get_scsi(kdev: &str) -> Option<BlkInfo> {
             wwid: pretty_wwid(&Sysfs::read(&sysfs_path)),
             blk_type: BlkType::Scsi,
             blk_path: format!("/dev/{}", &name),
-            name: name,
             owners_wwids: Vec::new(),
             owners_types: Vec::new(),
-            owners_names: Vec::new(),
             owners_paths: Vec::new(),
         });
     }
@@ -96,7 +92,6 @@ fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {
     let kdev = &event.kdev["+scsi:".len()..];
     if let Some(b) = blk_info_get_scsi(kdev) {
         let mut event = event.clone();
-        event.dev_name = b.name;
         event.dev_path = b.blk_path;
         event.dev_wwid = b.wwid;
         event

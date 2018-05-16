@@ -120,10 +120,8 @@ pub struct StorageEvent {
     pub event_id: String,
     pub event_type: String,
     pub dev_wwid: String,
-    pub dev_name: String,
     pub dev_path: String,
     pub owners_wwids: Vec<String>,
-    pub owners_names: Vec<String>,
     pub owners_paths: Vec<String>,
     // ^ What devices does current dev_wwid depending on.
     pub kdev: String, // internal use-only: kernel device name.
@@ -141,10 +139,8 @@ impl Default for StorageEvent {
             event_id: String::new(),
             event_type: String::new(),
             dev_wwid: String::new(),
-            dev_name: String::new(),
             dev_path: String::new(),
             owners_wwids: Vec::new(),
-            owners_names: Vec::new(),
             owners_paths: Vec::new(),
             kdev: String::new(),
             msg: String::new(),

@@ -6,13 +6,9 @@
   "event_id": "",
   "event_type": "DM_MPATH_PATH_FAILED",
   "dev_wwid": "360a98000324669436c2b45666c567946",
-  "dev_name": "360a98000324669436c2b45666c567946",
   "dev_path": "/dev/mapper/360a98000324669436c2b45666c567946",
   "owners_wwids": [
     "t10.NETAPP-LUN-2FiCl+EflVyF"
-  ],
-  "owners_names": [
-    "sdd"
   ],
   "owners_paths": [
     "/dev/sdd"

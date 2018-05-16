@@ -72,11 +72,9 @@ pub enum BlkType {
 pub struct BlkInfo {
     pub wwid: String,
     pub blk_type: BlkType,
-    pub name: String,
     pub blk_path: String,
     pub owners_wwids: Vec<String>,
     pub owners_types: Vec<BlkType>,
-    pub owners_names: Vec<String>,
     pub owners_paths: Vec<String>,
 }
 

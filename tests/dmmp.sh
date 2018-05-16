@@ -14,11 +14,9 @@ if [ "CHK$disk" == "CHK" ];then
     exit 1
 fi
 
-cat | sudo tee /etc/multipath.conf  << EOL
+sudo tee /etc/multipath.conf  << EOL
 defaults {
     user_friendly_names     yes
-    max_fds 20000
-    uxsock_timeout 10000
 }
 
 blacklist {
@@ -38,6 +36,7 @@ blacklist_exceptions {
     }
 }
 EOL
+
 
 sudo modprobe dm-multipath
 sudo systemctl restart multipathd

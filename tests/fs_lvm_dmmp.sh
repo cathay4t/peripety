@@ -59,7 +59,10 @@ if [ "CHK$1" != "CHK" ];then
     exit 1
 fi
 
+sleep 30
+
 sudo umount $MNT_POINT
+sleep 5
 sudo lvremove vg/lv -y
 sudo vgchange -an
 sudo vgremove vg -y

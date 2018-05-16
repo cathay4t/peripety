@@ -63,13 +63,10 @@ fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {
         if event.dev_wwid.len() == 0 {
             return;
         }
-        event.dev_name = blk_info.name.clone();
         event.dev_path = blk_info.blk_path.clone();
         event.owners_wwids = blk_info.owners_wwids;
-        event.owners_names = blk_info.owners_names;
         event.owners_paths = blk_info.owners_paths;
         event.owners_wwids.insert(0, blk_info.wwid);
-        event.owners_names.insert(0, blk_info.name);
         let mnt_pnt = get_mount_point(&blk_info.blk_path);
         if mnt_pnt.len() != 0 {
             event
