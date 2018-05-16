@@ -54,11 +54,9 @@ make test
     "root_cause_event_id":  "uudi_of_event_of_root_cause",
     "event_type":           "string_like DM_MPATH_PATH_DOWN",
     "dev_wwid":             "wwid_of_device_related",
-    "dev_name":             "device_name",
     "dev_path":             "device_path in /dev/ folder",
     "owners_wwids":         ["wwids of owner devices"],
-    "owners_names":         ["names of owner devices"],
-    "owners_paths":         ["paths of owner devices"],
+    "owners_paths":         ["block paths of owner devices"],
     "msg":                  "human_readable_message",
     "extentions":           {
         "plugin_specifc_1":     "value_1",
@@ -112,6 +110,8 @@ The configuration file will be `/etc/peripetyd.conf`, example:
 
 ```toml
 [main]
+notify_stdout = true
+save_to_journald = true
 
 [[collector_regexs]]
 # This regex is already build-in.
