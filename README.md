@@ -8,7 +8,8 @@
     * [Event format](#event-format)
     * [Thread types](#thread-types)
     * [Workflow](#workflow)
-    * [Daemon Configuration (TODO)](#daemon-configuration-todo)
+    * [Daemon Configuration.](#daemon-configuration)
+    * [What can be done by kernel](#what-can-be-done-by-kernel)
 
 <!-- vim-markdown-toc -->
 
@@ -104,7 +105,7 @@ make test
    event back to the daemon.
 5. The daemon broadcasts all synthetic events to notifier threads.
 
-## Daemon Configuration (TODO)
+## Daemon Configuration.
 
 The configuration file will be `/etc/peripetyd.conf`, example:
 
@@ -126,3 +127,11 @@ regex = '''(?x)
 sub_system = "multipath"
 event_type = "DM_MPATH_PATH_FAILED"
 ```
+
+## What can be done by kernel
+I have created [some patches][1] hoping kernel could provides in logs:
+ * Structured log via /dev/kmsg.
+ * WWID of device matters to fix race issue.
+ * Event type string to save regex capture.
+
+[1]: https://github.com/cathay4t/linux/commits/structured_log
