@@ -1,10 +1,12 @@
+ * User case trigger file system event on block predict error.
+ * Send pretty/better message to journald.
+ * CLI for monitor, query.
  * Support of NVMe logs.
  * Support of DM logs.
  * Support of mdraid logs.
- * Support of `/etc/peripetyd.conf`.
  * Create a AI-like root cause analyze thread.
  * Add license lines to all code files.
  * Allow user to configure regex on kmsg plugin.
- * Expand mpath parser to include FC/FCoE/iSCSI path information.
  * Support multipathd user space logs.
  * Support better daemon logging -- info/debug/warnning/error.
+ * Log udev add/change/del action of block.
