@@ -72,13 +72,12 @@ fn pretty_wwid(wwid: &str) -> String {
     let s = Regex::new(r"[ \t]+")
         .map(|r| r.replace_all(wwid.trim(), "-"))
         .expect("BUG: pretty_wwid()");
-        // we never panic as above regex string is valid.
+    // we never panic as above regex string is valid.
     Regex::new(r"(\\0)+$")
         .map(|r| r.replace_all(&s, ""))
         .expect("BUG: pretty_wwid()")
         // we never panic as above regex string is valid.
         .to_string()
-
 }
 
 fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {

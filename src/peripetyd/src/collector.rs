@@ -1,7 +1,3 @@
-extern crate nix;
-extern crate peripety;
-extern crate sdjournal;
-
 // Collector is supposed to get log from systemd journal and generate
 // event with kdev and sub system type.
 
@@ -9,8 +5,10 @@ extern crate sdjournal;
 // https://github.com/tasleson/storage_event_monitor/blob/master/src/main.rs
 // Which is MPL license.
 
+use nix;
 use nix::sys::select::FdSet;
 use peripety::{LogSeverity, StorageEvent, StorageSubSystem};
+use sdjournal;
 use std::collections::HashMap;
 use std::os::unix::io::AsRawFd;
 use std::sync::mpsc::{Receiver, Sender};

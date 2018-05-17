@@ -6,13 +6,13 @@ extern crate libc;
 
 use libc::{c_int, c_void, size_t, ENOENT};
 
-use std::ffi::CString;
+use std::collections::HashMap;
 use std::ffi::CStr;
+use std::ffi::CString;
+use std::fmt;
 use std::os::raw::c_char;
 use std::slice;
 use std::u64;
-use std::fmt;
-use std::collections::HashMap;
 
 use std::os::unix::io::{AsRawFd, RawFd};
 
@@ -291,7 +291,10 @@ impl Journal {
         let rc =
             unsafe { sd_journal_get_realtime_usec(self.handle, &mut usec) };
         if rc == 0 {
-            result.insert("__REALTIME_TIMESTAMP".to_string(), usec.to_string());
+            result.insert(
+                "__REALTIME_TIMESTAMP".to_string(),
+                usec.to_string(),
+            );
         } else {
             return Err(SdJournalError::CError(ClibraryError::new(
                 String::from("Error on sd_journal_get_realtime_usec"),

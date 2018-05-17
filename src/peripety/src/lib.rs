@@ -3,8 +3,8 @@ extern crate serde;
 extern crate serde_derive;
 extern crate serde_json;
 use std::collections::HashMap;
-use std::str::{self, FromStr};
 use std::fmt;
+use std::str::{self, FromStr};
 
 #[derive(Debug)]
 pub enum PeripetyError {
@@ -88,10 +88,9 @@ impl FromStr for StorageSubSystem {
             "EXT4" => Ok(StorageSubSystem::FsExt4),
             "XFS" => Ok(StorageSubSystem::FsXfs),
             "NVME" => Ok(StorageSubSystem::Nvme),
-            _ => Err(PeripetyError::StorageSubSystemParseError(format!(
-                "Invalid StorageSubSystem string {}",
-                s
-            ))),
+            _ => Err(PeripetyError::StorageSubSystemParseError(
+                format!("Invalid StorageSubSystem string {}", s),
+            )),
         }
     }
 }
@@ -153,13 +152,19 @@ impl StorageEvent {
     pub fn to_json_string(&self) -> Result<String, PeripetyError> {
         match serde_json::to_string(&self) {
             Ok(s) => Ok(s),
-            Err(e) => Err(PeripetyError::JsonSerializeError(format!("{}", e))),
+            Err(e) => Err(PeripetyError::JsonSerializeError(format!(
+                "{}",
+                e
+            ))),
         }
     }
     pub fn to_json_string_pretty(&self) -> Result<String, PeripetyError> {
         match serde_json::to_string_pretty(&self) {
             Ok(s) => Ok(s),
-            Err(e) => Err(PeripetyError::JsonSerializeError(format!("{}", e))),
+            Err(e) => Err(PeripetyError::JsonSerializeError(format!(
+                "{}",
+                e
+            ))),
         }
     }
     pub fn from_json_string(
@@ -167,9 +172,10 @@ impl StorageEvent {
     ) -> Result<StorageEvent, PeripetyError> {
         match serde_json::from_str(json_string) {
             Ok(e) => Ok(e),
-            Err(e) => {
-                Err(PeripetyError::JsonDeserializeError(format!("{}", e)))
-            }
+            Err(e) => Err(PeripetyError::JsonDeserializeError(format!(
+                "{}",
+                e
+            ))),
         }
     }
     pub fn from_slice(buff: &[u8]) -> Result<StorageEvent, PeripetyError> {
@@ -186,9 +192,10 @@ impl StorageEvent {
         };
         match serde_json::from_str(tmp_s) {
             Ok(e) => Ok(e),
-            Err(e) => {
-                Err(PeripetyError::JsonDeserializeError(format!("{}", e)))
-            }
+            Err(e) => Err(PeripetyError::JsonDeserializeError(format!(
+                "{}",
+                e
+            ))),
         }
     }
 }
