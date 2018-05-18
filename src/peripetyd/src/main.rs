@@ -55,6 +55,12 @@ fn send_to_journald(event: &StorageEvent) {
         "SUB_SYSTEM".to_string(),
         event.sub_system.to_string(),
     ));
+    logs.push((
+        "JSON".to_string(),
+        event
+            .to_json_string()
+            .expect("BUG: event.to_json_string()"),
+    ));
     if let Err(e) = sdjournal::send_journal_list(&logs) {
         println!("Failed to save event to journald: {}", e);
     }

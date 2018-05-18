@@ -32,7 +32,7 @@ impl fmt::Display for PeripetyError {
 }
 
 #[repr(u8)]
-#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, PartialOrd)]
 // https://tools.ietf.org/html/rfc5424#section-6.2.1
 pub enum LogSeverity {
     Emergency = 0,
@@ -49,15 +49,15 @@ pub enum LogSeverity {
 impl FromStr for LogSeverity {
     type Err = PeripetyError;
     fn from_str(s: &str) -> Result<LogSeverity, PeripetyError> {
-        match s.as_ref() {
-            "0" => Ok(LogSeverity::Emergency),
-            "1" => Ok(LogSeverity::Alert),
-            "2" => Ok(LogSeverity::Ctritical),
-            "3" => Ok(LogSeverity::Error),
-            "4" => Ok(LogSeverity::Warning),
-            "5" => Ok(LogSeverity::Notice),
-            "6" => Ok(LogSeverity::Info),
-            "7" => Ok(LogSeverity::Debug),
+        match s.to_uppercase().as_ref() {
+            "0" | "EMERGENCY" => Ok(LogSeverity::Emergency),
+            "1" | "ALERT" => Ok(LogSeverity::Alert),
+            "2" | "CRITICAL" => Ok(LogSeverity::Ctritical),
+            "3" | "ERROR" => Ok(LogSeverity::Error),
+            "4" | "WARNING" => Ok(LogSeverity::Warning),
+            "5" | "Notice" => Ok(LogSeverity::Notice),
+            "6" | "INFO" => Ok(LogSeverity::Info),
+            "7" | "DEBUG" => Ok(LogSeverity::Debug),
             _ => Err(PeripetyError::LogSeverityParseError(format!(
                 "Invalid severity string {}",
                 s

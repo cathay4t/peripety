@@ -1,0 +1,10 @@
+[package]
+name = "prpt"
+version = "0.1.0"
+authors = ["Gris Ge <fge@redhat.com>"]
+
+[dependencies]
+peripety = { path = "../peripety", version = "0.1.0"}
+sdjournal = { path = "../sdjournal", version = "0.1.0"}
+nix = "0.10.0"
+clap = "2.31.2"
