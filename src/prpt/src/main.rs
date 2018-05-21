@@ -127,18 +127,18 @@ fn arg_match_to_cliopt(matches: &ArgMatches) -> CliOpt {
 fn handle_event(event: &StorageEvent, cli_opt: &CliOpt) {
     let mut is_match = true;
 
-    if let Some(l) = &cli_opt.severity {
+    if let Some(ref l) = cli_opt.severity {
         if l < &event.severity {
             is_match = false;
         }
     }
-    if let Some(subs) = &cli_opt.sub_systems {
+    if let Some(ref subs) = cli_opt.sub_systems {
         if subs.len() != 0 && !subs.contains(&event.sub_system) {
             is_match = false;
         }
     }
 
-    if let Some(ets) = &cli_opt.event_types {
+    if let Some(ref ets) = cli_opt.event_types {
         if ets.len() != 0 && !ets.contains(&event.event_type) {
             is_match = false;
         }
@@ -177,7 +177,7 @@ fn handle_event(event: &StorageEvent, cli_opt: &CliOpt) {
 }
 
 fn handle_monitor(cli_opt: &CliOpt) {
-    if let Some(_) = &cli_opt.since {
+    if let Some(_) = cli_opt.since {
         quit_with_msg("`monitor` sub-command does not allow `--since` option");
     }
 
