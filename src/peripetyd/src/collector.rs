@@ -5,6 +5,7 @@
 // https://github.com/tasleson/storage_event_monitor/blob/master/src/main.rs
 // Which is MPL license.
 
+use chrono::{Local, TimeZone, SecondsFormat};
 use nix;
 use nix::sys::select::FdSet;
 use peripety::{LogSeverity, StorageEvent, StorageSubSystem};
@@ -104,7 +105,15 @@ fn process_journal_entry(
         .to_string();
 
     if let Some(t) = entry.get("__REALTIME_TIMESTAMP") {
-        event.timestamp = t.parse().unwrap_or(0);
+        let tp = match t.parse::<i64>() {
+            Ok(t) => t,
+            Err(_) => return,
+        };
+        event.timestamp = Local
+            .timestamp(tp / 10i64.pow(6), (tp % 10i64.pow(6)) as u32)
+            .to_rfc3339_opts(SecondsFormat::Micros, false)
+    } else {
+        return;
     }
 
     if let Some(p) = entry.get("PRIORITY") {

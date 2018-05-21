@@ -4,8 +4,9 @@
     * [Why another daemon?](#why-another-daemon)
         * [Why not expand udisks for this?](#why-not-expand-udisks-for-this)
         * [Why this tool is better?](#why-this-tool-is-better)
+    * [Features](#features)
     * [How-to](#how-to)
-    * [Event format](#event-format)
+    * [Event example](#event-example)
     * [Thread types](#thread-types)
     * [Workflow](#workflow)
     * [Daemon Configuration.](#daemon-configuration)
@@ -34,38 +35,71 @@
 
  * Only do one thing quick and simple -- provide storage events.
 
+
+## Features
+
+ * Provides device consistent id, event type and extra information like
+   FC/iSCSI path detail and FS mount point.
+
+ * CLI tool `prpt` to query and monitor events.
+
+ * Use sysfs and devfs for information query only. Designed to handle
+   log burst.
+
+ * Events are stored in journald with structured data(JSON).
+
+ * Allows user defined regex in /etc/peripetyd.conf.
+
+ * TBD: C/python/rust lightweight library for query block information
+   on all kind of dev string(major:minor, scsi_id, nvme ctrl_id+ns_id,
+   etc).
+
+ * TODO: Varlink(json) interface.
+
+ * TODO: Handle user space tool logs like mulitpathd, iscsid.
+
+
 ## How-to
+
+ * Start Daemon
 
 ```bash
 make
 make run
-
-# Then open another terminal to generate some storage errors
-make test
 ```
 
-## Event format
-```json
-{
-    "hostname":             "gris-laptop.example.com",
-    "severity":             "info|warn|error",
-    "system":               "scsi|lvm|multipath|block|fs|mdraid",
-    "timestamp":            1522130579,
-    "event_id":             "uuid_of_event",
-    "root_cause_event_id":  "uudi_of_event_of_root_cause",
-    "event_type":           "string_like DM_MPATH_PATH_DOWN",
-    "dev_wwid":             "wwid_of_device_related",
-    "dev_path":             "device_path in /dev/ folder",
-    "owners_wwids":         ["wwids of owner devices"],
-    "owners_paths":         ["block paths of owner devices"],
-    "msg":                  "human_readable_message",
-    "extentions":           {
-        "plugin_specifc_1":     "value_1",
-        "plugin_specifc_2":     "value_2",
-        "plugin_specifc_3":     "value_3"
-    }
-}
+ * Start monitor CLI
+
+```bash
+./target/debug/prpt monitor --format JsonPretty
 ```
+
+ * Trigger some events
+
+```
+# SCSI sector hardware error
+./tests/scsi.sh
+# Multipath path failure
+./tests/dmmp.sh
+# File system I/O error
+./tests/fs.sh
+# File system over LVM over multipath
+./tests/fs_lvm_dmmp.sh
+# LVM ThinProvisioning pool full
+./tests/lvm_tp.sh
+```
+
+ * Query events
+
+```bash
+./target/debug/prpt query
+```
+
+## Event example
+
+* [Ext4 mounted on LVM LV over SCSI multipath][2]
+
+* [FC Multipath got path failure][3]
 
 ## Thread types
 * **Collector**
@@ -135,3 +169,5 @@ I have created [some patches][1] hoping kernel could provides in logs:
  * Event type string to save regex capture.
 
 [1]: https://github.com/cathay4t/linux/commits/structured_log
+[2]: https://github.com/cathay4t/peripety/blob/master/examples/fs/ext4_mount_lv_mpath_scsi.json
+[3]: https://github.com/cathay4t/peripety/blob/master/examples/mpath/mpath_fc_path_offline.json

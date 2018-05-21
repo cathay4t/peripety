@@ -6,6 +6,7 @@ extern crate sdjournal;
 #[macro_use]
 extern crate serde_derive;
 extern crate toml;
+extern crate chrono;
 
 mod collector;
 mod conf;
@@ -71,10 +72,10 @@ fn handle_events_from_parsers(
     parsers: &Vec<ParserInfo>,
     daemon_conf: Option<ConfMain>,
 ) {
-    let mut skip_stdout = false;
+    let mut skip_stdout = true;
     if let Some(c) = daemon_conf {
-        if c.notify_stdout == Some(false) {
-            skip_stdout = true;
+        if c.notify_stdout == Some(true) {
+            skip_stdout = false;
         }
     }
     loop {
@@ -152,6 +153,7 @@ fn collector_to_parsers(
             }
             Err(e) => {
                 println!("Failed to retrieve event from collector: {}", e);
+                return;
             }
         }
     }

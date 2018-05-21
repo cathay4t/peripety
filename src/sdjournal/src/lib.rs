@@ -143,6 +143,14 @@ extern "C" {
     fn sd_journal_get_fd(j: *mut SdJournal) -> c_int;
 
     fn sd_journal_get_events(j: *mut SdJournal) -> c_int;
+
+    fn sd_journal_add_match(
+        j: *mut SdJournal,
+        data: *const c_void,
+        length: libc::size_t,
+    ) -> c_int;
+
+    fn sd_journal_seek_realtime_usec(j: *mut SdJournal, usec: u64) -> c_int;
 }
 
 // Copied and pasted from https://github.com/rust-lang/rust/blob/master/src/libstd/sys/unix/os.rs
@@ -309,7 +317,8 @@ impl Journal {
         let x = unsafe { sd_journal_get_events(self.handle) };
         return x as i16;
     }
-    pub fn seek_tail(&mut self) -> Result<bool, SdJournalError> {
+
+    pub fn seek_tail(&mut self) -> Result<(), SdJournalError> {
         let rc = unsafe { sd_journal_seek_tail(self.handle) };
         if rc < 0 {
             return Err(SdJournalError::CError(ClibraryError::new(
@@ -326,7 +335,7 @@ impl Journal {
                 rc,
             )));
         }
-        Ok(true)
+        Ok(())
     }
 
     fn get_next_entry(
@@ -376,11 +385,43 @@ impl Journal {
     ) -> Option<Result<HashMap<String, String>, SdJournalError>> {
         self.get_next_entry()
     }
+
+    pub fn add_match(&mut self, filter: &str) -> Result<(), SdJournalError> {
+        let filter = CString::new(filter)?;
+        let rc = unsafe {
+            sd_journal_add_match(
+                self.handle,
+                filter.as_ptr() as *const c_void,
+                0 as libc::size_t,
+            )
+        };
+        if rc < 0 {
+            return Err(SdJournalError::CError(ClibraryError::new(
+                String::from("Error on sd_journal_add_match"),
+                rc,
+            )));
+        }
+        Ok(())
+    }
+
+    pub fn seek_realtime_usec(
+        &mut self,
+        usec: u64,
+    ) -> Result<(), SdJournalError> {
+        let rc = unsafe { sd_journal_seek_realtime_usec(self.handle, usec) };
+        if rc < 0 {
+            return Err(SdJournalError::CError(ClibraryError::new(
+                String::from("Error on sd_journal_seek_realtime_usec"),
+                rc,
+            )));
+        }
+        Ok(())
+    }
 }
 
 pub fn send_journal_list(
     logs: &[(String, String)],
-) -> Result<bool, SdJournalError> {
+) -> Result<(), SdJournalError> {
     let mut iovs: Vec<libc::iovec> = Vec::new();
     let mut msgs: Vec<CString> = Vec::new(); // to hold the lifetime of msg.
     for &(ref key, ref value) in logs {
@@ -390,7 +431,7 @@ pub fn send_journal_list(
     for msg in &msgs {
         let len = msg.as_bytes().len();
         iovs.push(libc::iovec {
-            iov_base: msg.as_ptr() as *mut libc::c_void,
+            iov_base: msg.as_ptr() as *mut c_void,
             iov_len: len,
         });
     }
@@ -401,7 +442,7 @@ pub fn send_journal_list(
             rc,
         )));
     }
-    Ok(true)
+    Ok(())
 }
 
 impl Iterator for Journal {

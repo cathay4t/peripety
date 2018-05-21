@@ -5,7 +5,7 @@ tidy:
 	cargo fmt
 
 run: all
-	sudo cargo run
+	sudo target/debug/peripetyd
 
 check:
 	./tests/scsi.sh
