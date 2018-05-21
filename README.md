@@ -1,40 +1,21 @@
 <!-- vim-markdown-toc GFM -->
 
 * [Storage Event Notification Daemon](#storage-event-notification-daemon)
-    * [Why another daemon?](#why-another-daemon)
-        * [Why not expand udisks for this?](#why-not-expand-udisks-for-this)
-        * [Why this tool is better?](#why-this-tool-is-better)
     * [Features](#features)
     * [How-to](#how-to)
     * [Event example](#event-example)
     * [Thread types](#thread-types)
     * [Workflow](#workflow)
     * [Daemon Configuration.](#daemon-configuration)
-    * [What can be done by kernel](#what-can-be-done-by-kernel)
+    * [FAQ](#faq)
+        * [What can be done by kernel](#what-can-be-done-by-kernel)
+        * [Why another daemon?](#why-another-daemon)
+            * [Why not expand udisks for this?](#why-not-expand-udisks-for-this)
+            * [Why this tool is better?](#why-this-tool-is-better)
 
 <!-- vim-markdown-toc -->
 
 # Storage Event Notification Daemon
-
-## Why another daemon?
-
-### Why not expand udisks for this?
-
- * Current design of udisks require modules written in C which is not a good
-   language for string manipulation which is quit common when parsing eventing.
-
- * Udisks components are trigger by uevent which only have add/change/del
-   event type defined, modules need to extra work to find out what just
-   happened. Yes, we can change udisks to support event types, but IMHO, that
-   require much more work than creating new storage event daemon in rust.
-
-### Why this tool is better?
-
- * Rust is memory-leak-proof and quite easy to handle threading, IPC and string
-   manipulation.
-
- * Only do one thing quick and simple -- provide storage events.
-
 
 ## Features
 
@@ -162,11 +143,32 @@ sub_system = "multipath"
 event_type = "DM_MPATH_PATH_FAILED"
 ```
 
-## What can be done by kernel
+## FAQ
+
+### What can be done by kernel
 I have created [some patches][1] hoping kernel could provides in logs:
  * Structured log via /dev/kmsg.
  * WWID of device matters to fix race issue.
  * Event type string to save regex capture.
+
+### Why another daemon?
+
+#### Why not expand udisks for this?
+
+ * Current design of udisks require modules written in C which is not a good
+   language for string manipulation which is quit common when parsing eventing.
+
+ * Udisks components are trigger by uevent which only have add/change/del
+   event type defined, modules need to extra work to find out what just
+   happened. Yes, we can change udisks to support event types, but IMHO, that
+   require much more work than creating new storage event daemon in rust.
+
+#### Why this tool is better?
+
+ * Rust is memory-leak-proof and quite easy to handle threading, IPC and string
+   manipulation.
+
+ * Only do one thing quick and simple -- provide storage events.
 
 [1]: https://github.com/cathay4t/linux/commits/structured_log
 [2]: https://github.com/cathay4t/peripety/blob/master/examples/fs/ext4_mount_lv_mpath_scsi.json
