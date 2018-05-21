@@ -52,7 +52,8 @@ make run
  * Start monitor CLI
 
 ```bash
-./target/debug/prpt monitor --format JsonPretty
+# You may remove the `sudo` if in `systemd-journal` group.
+sudo ./target/debug/prpt monitor --format JsonPretty
 ```
 
  * Trigger some events
@@ -73,7 +74,8 @@ make run
  * Query events
 
 ```bash
-./target/debug/prpt query
+# You may remove the `sudo` if in `systemd-journal` group.
+sudo ./target/debug/prpt query
 ```
 
 ## Event example
