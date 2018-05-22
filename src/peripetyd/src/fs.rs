@@ -1,8 +1,5 @@
-extern crate libc;
-extern crate peripety;
-extern crate regex;
-
 use data::{BlkInfo, EventType, ParserInfo};
+use libc;
 use peripety::{StorageEvent, StorageSubSystem};
 use std::ffi::CStr;
 use std::ffi::CString;
@@ -69,11 +66,34 @@ fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {
         event.owners_wwids.insert(0, blk_info.wwid);
         let mnt_pnt = get_mount_point(&blk_info.blk_path);
         if mnt_pnt.len() != 0 {
+            {
+                event.msg = format!(
+                    "{}, dev_path: '{}', mount point: '{}'",
+                    event.raw_msg, event.dev_path, mnt_pnt
+                )
+            }
+
             event
                 .extention
-                .insert("mount_point".to_string(), mnt_pnt);
+                .insert("mount_point".to_string(), mnt_pnt.clone());
         }
         event.owners_paths.insert(0, blk_info.blk_path);
+        if event.event_type.len() != 0 {
+            event.msg = format!(
+                "{} uuid: '{}', dev_wwid: '{}'",
+                event.raw_msg, event.dev_wwid, event.owners_wwids[0]
+            );
+            if event.dev_path.len() != 0 {
+                event
+                    .msg
+                    .push_str(&format!(" dev_path: '{}'", event.dev_path));
+            }
+            if mnt_pnt.len() != 0 {
+                event
+                    .msg
+                    .push_str(&format!(" mount_point: '{}'", mnt_pnt));
+            }
+        }
 
         if let Err(e) = sender.send(event) {
             println!("fs_parser: Failed to send event: {}", e);

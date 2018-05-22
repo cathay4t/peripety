@@ -151,9 +151,13 @@ fn handle_event(event: &StorageEvent, cli_opt: &CliOpt) {
                     .expect("BUG: DateTime::parse_from_rfc3339()")
                     .with_timezone(&Local)
                     .to_rfc2822();
+                let mut msg = &event.raw_msg;
+                if event.msg.len() != 0 {
+                    msg = &event.msg;
+                }
                 println!(
                     "{} {} {} {}",
-                    ts, event.hostname, event.sub_system, event.msg
+                    ts, event.hostname, event.sub_system, msg
                 )
             }
             OutputFormat::Json => {
@@ -246,9 +250,11 @@ fn handle_query(cli_opt: &CliOpt) {
         match entry {
             Ok(entry) => {
                 if let Some(j) = entry.get("JSON") {
-                    if let Ok(event) = StorageEvent::from_json_string(j) {
-                        handle_event(&event, &cli_opt);
-                    }
+                    match StorageEvent::from_json_string(j) {
+                        Ok(event) => handle_event(&event, &cli_opt),
+                        Err(e) => println!("Error: {}", e),
+                    };
+
                 }
             }
             Err(e) => println!("Error retrieving the journal entry: {:?}", e),

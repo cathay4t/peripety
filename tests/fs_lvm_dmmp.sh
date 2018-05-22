@@ -63,6 +63,12 @@ sleep 30
 
 sudo umount $MNT_POINT
 sleep 5
+sudo mkfs.xfs -f /dev/mapper/vg-lv
+sudo mount /dev/mapper/vg-lv $MNT_POINT
+sleep 30
+
+sudo umount $MNT_POINT
+sleep 5
 sudo lvremove vg/lv -y
 sudo vgchange -an
 sudo vgremove vg -y

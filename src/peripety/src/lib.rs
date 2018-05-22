@@ -103,8 +103,8 @@ impl std::fmt::Display for StorageSubSystem {
             StorageSubSystem::Scsi => write!(fmt, "SCSI"),
             StorageSubSystem::LvmThin => write!(fmt, "LvmThin"),
             StorageSubSystem::Multipath => write!(fmt, "Multipath"),
-            StorageSubSystem::FsExt4 => write!(fmt, "FsExt4"),
-            StorageSubSystem::FsXfs => write!(fmt, "FsXfs"),
+            StorageSubSystem::FsExt4 => write!(fmt, "ext4"),
+            StorageSubSystem::FsXfs => write!(fmt, "xfs"),
             StorageSubSystem::Nvme => write!(fmt, "NVMe"),
         }
     }
@@ -123,8 +123,10 @@ pub struct StorageEvent {
     pub owners_wwids: Vec<String>,
     pub owners_paths: Vec<String>,
     // ^ What devices does current dev_wwid depending on.
+    #[serde(skip_serializing, skip_deserializing)]
     pub kdev: String, // internal use-only: kernel device name.
     pub msg: String,
+    pub raw_msg: String,
     pub extention: HashMap<String, String>,
 }
 
@@ -143,6 +145,7 @@ impl Default for StorageEvent {
             owners_paths: Vec::new(),
             kdev: String::new(),
             msg: String::new(),
+            raw_msg: String::new(),
             extention: HashMap::new(),
         }
     }

@@ -7,6 +7,7 @@ extern crate sdjournal;
 extern crate serde_derive;
 extern crate toml;
 extern crate chrono;
+extern crate libc;
 
 mod collector;
 mod conf;
@@ -32,7 +33,9 @@ fn send_to_journald(event: &StorageEvent) {
         "PRIORITY".to_string(),
         format!("{}", event.severity as u8),
     ));
-    logs.push(("RAW_MESSAGE".to_string(), event.msg.clone()));
+    if event.msg.len() != 0 {
+        logs.push(("MESSAGE".to_string(), event.msg.clone()));
+    }
     logs.push(("DEV_WWID".to_string(), event.dev_wwid.clone()));
     logs.push(("DEV_PATH".to_string(), event.dev_path.clone()));
     for owners_wwid in &event.owners_wwids {

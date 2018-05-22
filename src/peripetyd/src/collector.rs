@@ -126,7 +126,7 @@ fn process_journal_entry(
         }
     }
 
-    event.msg = msg.to_string();
+    event.raw_msg = msg.to_string();
     //TODO(Gris Ge): Generate event_id here.
 
     //TODO(Gris Ge): Need to skip journal entry when that one is created by
