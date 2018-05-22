@@ -10,7 +10,7 @@ extern crate peripety;
 extern crate sdjournal;
 
 use chrono::{DateTime, Local, TimeZone};
-use clap::{App, Arg, ArgMatches, SubCommand};
+use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use nix::sys::select::FdSet;
 use peripety::{LogSeverity, StorageEvent, StorageSubSystem};
 use std::os::unix::io::AsRawFd;
@@ -281,6 +281,7 @@ fn main() {
         .version("0.1")
         .author("Gris Ge <fge@redhat.com>")
         .about("CLI utile for peripety events")
+        .setting(AppSettings::SubcommandRequiredElseHelp)
         .subcommand(
             SubCommand::with_name("monitor")
                 .about("Monitor following up events")
