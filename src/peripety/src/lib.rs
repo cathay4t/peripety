@@ -71,6 +71,7 @@ pub enum StorageSubSystem {
     Unknown,
     Other,
     Scsi,
+    DmDirtyLog,
     LvmThin,
     Multipath,
     FsExt4,
@@ -83,7 +84,8 @@ impl FromStr for StorageSubSystem {
     fn from_str(s: &str) -> Result<StorageSubSystem, PeripetyError> {
         match s.to_uppercase().as_ref() {
             "SCSI" => Ok(StorageSubSystem::Scsi),
-            "LVMTHIN" => Ok(StorageSubSystem::LvmThin),
+            "DM-DIRTYLOG" => Ok(StorageSubSystem::DmDirtyLog),
+            "LVM-THINPROVISIONING" => Ok(StorageSubSystem::LvmThin),
             "MULTIPATH" => Ok(StorageSubSystem::Multipath),
             "EXT4" => Ok(StorageSubSystem::FsExt4),
             "XFS" => Ok(StorageSubSystem::FsXfs),
@@ -101,7 +103,8 @@ impl std::fmt::Display for StorageSubSystem {
             StorageSubSystem::Unknown => write!(fmt, "Unknown"),
             StorageSubSystem::Other => write!(fmt, "Other"),
             StorageSubSystem::Scsi => write!(fmt, "SCSI"),
-            StorageSubSystem::LvmThin => write!(fmt, "LvmThin"),
+            StorageSubSystem::DmDirtyLog => write!(fmt, "DM-DirtyLog"),
+            StorageSubSystem::LvmThin => write!(fmt, "LVM-ThinProvisioning"),
             StorageSubSystem::Multipath => write!(fmt, "Multipath"),
             StorageSubSystem::FsExt4 => write!(fmt, "ext4"),
             StorageSubSystem::FsXfs => write!(fmt, "xfs"),
@@ -127,7 +130,7 @@ pub struct StorageEvent {
     pub kdev: String, // internal use-only: kernel device name.
     pub msg: String,
     pub raw_msg: String,
-    pub extention: HashMap<String, String>,
+    pub extension: HashMap<String, String>,
 }
 
 impl Default for StorageEvent {
@@ -146,7 +149,7 @@ impl Default for StorageEvent {
             kdev: String::new(),
             msg: String::new(),
             raw_msg: String::new(),
-            extention: HashMap::new(),
+            extension: HashMap::new(),
         }
     }
 }

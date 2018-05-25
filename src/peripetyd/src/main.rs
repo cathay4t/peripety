@@ -16,6 +16,7 @@ mod dm;
 mod fs;
 mod mpath;
 mod scsi;
+mod buildin_regex;
 
 use chan_signal::Signal;
 use conf::ConfMain;
@@ -44,7 +45,7 @@ fn send_to_journald(event: &StorageEvent) {
     for owners_path in &event.owners_paths {
         logs.push(("OWNERS_PATHS".to_string(), owners_path.clone()));
     }
-    for (key, value) in &event.extention {
+    for (key, value) in &event.extension {
         logs.push((
             format!("EXT_{}", key.to_uppercase()),
             value.clone(),

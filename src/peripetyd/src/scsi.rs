@@ -81,21 +81,33 @@ fn pretty_wwid(wwid: &str) -> String {
 }
 
 fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {
-    if !event.kdev.starts_with("+scsi:") {
-        println!(
-            "scsi: Got unexpected kdev: {} for event {:?}",
-            event.kdev, event
-        );
-        return;
+    let mut kdev: &str = &event.kdev;
+    if event.kdev.starts_with("+scsi:") {
+        kdev = &event.kdev["+scsi:".len()..];
     }
-    let kdev = &event.kdev["+scsi:".len()..];
     if let Some(b) = blk_info_get_scsi(kdev) {
         let mut event = event.clone();
         event.dev_path = b.blk_path;
         event.dev_wwid = b.wwid;
         event
-            .extention
+            .extension
             .insert("scsi_id".to_string(), kdev.to_string());
+
+        if event.event_type == "SCSI_SENSE_KEY" {
+            if let Some(sense_key) = event.extension.get("sense_key") {
+                match sense_key.as_ref() {
+                    // Find a way to use follow up CBD event to extract
+                    // sector number of medium error.
+                    "Medium Error" => {
+                        event.event_type = "SCSI_MEDIUM_ERROR".to_string()
+                    }
+                    "Hardware Error" => {
+                        event.event_type = "SCSI_HARDWARE_ERROR".to_string()
+                    }
+                    _ => {}
+                }
+            }
+        }
 
         if let Err(e) = sender.send(event) {
             println!("scsi_parser: Failed to send event: {}", e);

@@ -74,7 +74,7 @@ fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {
             }
 
             event
-                .extention
+                .extension
                 .insert("mount_point".to_string(), mnt_pnt.clone());
         }
         event.owners_paths.insert(0, blk_info.blk_path);

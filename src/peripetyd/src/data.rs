@@ -1,6 +1,3 @@
-extern crate peripety;
-extern crate regex;
-
 use dm;
 use peripety::{StorageEvent, StorageSubSystem};
 use regex::Regex;
@@ -91,7 +88,7 @@ impl BlkInfo {
         }
 
         // scsi_id: 4:0:1:1
-        if let Ok(reg) = Regex::new(r"^(:?[0-9]+:){3}[0-9]+$") {
+        if let Ok(reg) = Regex::new(r"^(?:[0-9]+:){3}[0-9]+$") {
             if reg.is_match(kdev) {
                 return scsi::blk_info_get_scsi(kdev);
             }
@@ -108,87 +105,6 @@ impl BlkInfo {
         None
     }
 }
-
-pub const BUILD_IN_REGEX_CONFS: &[RegexConfStr] = &[
-    RegexConfStr {
-        starts_with: Some("device-mapper: multipath:"),
-        regex: r"(?x)
-                ^device-mapper:\s
-                multipath:\ Failing\ path\s
-                (?P<kdev>\d+:\d+).$
-                ",
-        sub_system: "multipath",
-        event_type: "DM_MPATH_PATH_FAILED",
-    },
-    RegexConfStr {
-        starts_with: Some("device-mapper: multipath:"),
-        regex: r"(?x)
-                ^device-mapper:\s
-                multipath:\ Reinstating\ path\s
-                (?P<kdev>\d+:\d+).$
-                ",
-        sub_system: "multipath",
-        event_type: "DM_MPATH_PATH_REINSTATED",
-    },
-    RegexConfStr {
-        starts_with: Some("EXT4-fs "),
-        regex: r"(?x)
-                ^EXT4-fs\s
-                \((?P<kdev>[^\s\)]+)\):\s
-                mounted\ filesystem\s
-                ",
-        sub_system: "ext4",
-        event_type: "DM_FS_MOUNTED",
-    },
-    RegexConfStr {
-        starts_with: Some("XFS "),
-        regex: r"(?x)
-                ^XFS \s
-                \((?P<kdev>[^\s\)]+)\):\s
-                Ending\ clean\ mount",
-        sub_system: "xfs",
-        event_type: "DM_FS_MOUNTED",
-    },
-    RegexConfStr {
-        starts_with: Some("XFS "),
-        regex: r"(?x)
-                ^XFS\s
-                \((?P<kdev>[^\s\)]+)\):\s
-                Unmounting\ Filesystem$",
-        sub_system: "xfs",
-        event_type: "DM_FS_UNMOUNTED",
-    },
-    RegexConfStr {
-        starts_with: Some("XFS "),
-        regex: r"(?x)
-                ^XFS \s
-                \((?P<kdev>[^\s\)]+)\):\s
-                writeback\ error\ on\ sector",
-        sub_system: "xfs",
-        event_type: "DM_FS_IO_ERROR",
-    },
-    RegexConfStr {
-        starts_with: Some("EXT4-fs "),
-        regex: r"(?x)
-                ^EXT4-fs\s
-                warning\ \(device\s
-                (?P<kdev>[^\s\)]+)\):\s
-                ext4_end_bio:[0-9]+:\ I/O\ error
-                ",
-        sub_system: "ext4",
-        event_type: "DM_FS_IO_ERROR",
-    },
-    RegexConfStr {
-        starts_with: Some("JBD2: "),
-        regex: r"(?x)
-                ^JBD2:\s
-                Detected\ IO\ errors\ while\ flushing\ file\ data\ on\s
-                (?P<kdev>[^\s]+)-[0-9]+$
-                ",
-        sub_system: "ext4",
-        event_type: "DM_FS_IO_ERROR",
-    },
-];
 
 pub struct Sysfs;
 

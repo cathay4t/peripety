@@ -1,5 +1,6 @@
  * User case trigger file system event on block predict error.
  * Send pretty/better message to journald.
+ * prpt query --dev <wwid/dev_path/dev_name/major_min/etc>
  * Support of NVMe logs.
  * Support of DM logs.
  * Support of mdraid logs.

@@ -254,7 +254,6 @@ fn handle_query(cli_opt: &CliOpt) {
                         Ok(event) => handle_event(&event, &cli_opt),
                         Err(e) => println!("Error: {}", e),
                     };
-
                 }
             }
             Err(e) => println!("Error retrieving the journal entry: {:?}", e),
@@ -266,6 +265,7 @@ fn main() {
     let sev_arg = Arg::from_usage(
         "--severity=[SEVERITY] 'Only show event with equal or higher severity'",
     ).possible_values(&Severity::variants())
+        .case_insensitive(true)
         .default_value("Debug");
 
     let evt_arg = Arg::from_usage(
@@ -281,6 +281,7 @@ fn main() {
 
     let fmt_arg = Arg::from_usage("--format [FORMAT] 'Event output format'")
         .possible_values(&OutputFormat::variants())
+        .case_insensitive(true)
         .default_value("Basic");
 
     let matches = App::new("Peripety CLI")

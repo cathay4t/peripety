@@ -5,7 +5,7 @@
 // https://github.com/tasleson/storage_event_monitor/blob/master/src/main.rs
 // Which is MPL license.
 
-use chrono::{Local, TimeZone, SecondsFormat};
+use chrono::{Local, SecondsFormat, TimeZone};
 use nix;
 use nix::sys::select::FdSet;
 use peripety::{LogSeverity, StorageEvent, StorageSubSystem};
@@ -14,8 +14,9 @@ use std::collections::HashMap;
 use std::os::unix::io::AsRawFd;
 use std::sync::mpsc::{Receiver, Sender};
 
+use buildin_regex::BUILD_IN_REGEX_CONFS;
 use conf::ConfCollector;
-use data::{RegexConf, BUILD_IN_REGEX_CONFS};
+use data::RegexConf;
 
 fn process_journal_entry(
     entry: &HashMap<String, String>,
@@ -69,6 +70,13 @@ fn process_journal_entry(
         .iter()
         .chain(user_regex_confs.iter())
     {
+        // Save CPU if event.sub_system is defined and not matching with regex
+        // config.
+        if event.sub_system != StorageSubSystem::Unknown
+            && regex_conf.sub_system != event.sub_system
+        {
+            continue;
+        }
         // Save CPU from regex.captures() if starts_with() failed.
         if let Some(ref s) = regex_conf.starts_with {
             if !msg.starts_with(s) {
@@ -90,6 +98,21 @@ fn process_journal_entry(
             if regex_conf.event_type.len() != 0 {
                 event.event_type = regex_conf.event_type.to_string();
             }
+
+            // If regex has other named group, we save it to event.extension.
+            for name in regex_conf.regex.capture_names() {
+                if let Some(name) = name {
+                    if name == "kdev" {
+                        continue;
+                    }
+                    if let Some(m) = cap.name(name) {
+                        event
+                            .extension
+                            .insert(name.to_string(), m.as_str().to_string());
+                    }
+                }
+            }
+
             break;
         }
     }

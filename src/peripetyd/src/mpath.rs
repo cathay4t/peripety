@@ -290,11 +290,11 @@ fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {
                 if blk_info.blk_type == BlkType::Scsi {
                     // Check for iSCSI/FC/FCoE informations.
                     for (key, value) in get_transport_info(&blk_info.blk_path) {
-                        event.extention.insert(key, value);
+                        event.extension.insert(key, value);
                     }
                 }
             }
-            event.extention.insert(
+            event.extension.insert(
                 "blk_major_minor".to_string(),
                 event.kdev.clone(),
             );
