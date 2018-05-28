@@ -1,103 +1,55 @@
-use data::{BlkInfo, EventType, ParserInfo};
-use libc;
-use peripety::{StorageEvent, StorageSubSystem};
-use std::ffi::CStr;
-use std::ffi::CString;
-use std::fs;
-use std::path::Path;
+use data::{EventType, ParserInfo};
+use peripety::{BlkInfo, StorageEvent, StorageSubSystem};
 use std::sync::mpsc;
 use std::sync::mpsc::Sender;
 use std::thread::spawn;
 
-fn uuid_of_blk(blk_path: &str) -> String {
-    let path = Path::new(&blk_path);
-    if !path.exists() {
-        println!("fs_parser: Path {} does not exists", blk_path);
-        return String::new();
-    }
-
-    let blk_path = match path.canonicalize() {
-        Ok(b) => b,
-        Err(e) => {
-            println!(
-                "fs_parser: Failed to find canonicalize path of {}: {}",
-                blk_path, e
-            );
-            return String::new();
-        }
-    };
-    let entries = match fs::read_dir("/dev/disk/by-uuid") {
-        Ok(es) => es,
-        Err(e) => {
-            println!(
-                "fs_parser: Failed to read_dir {}: {}",
-                "/dev/disk/by-uuid", e
-            );
-            return String::new();
-        }
-    };
-    for entry in entries {
-        if let Ok(entry) = entry {
-            if let Ok(p) = fs::read_link(&entry.path()) {
-                let link_path = Path::new("/dev/disk/by-uuid/").join(p);
-                if let Ok(cur_path) = link_path.canonicalize() {
-                    if cur_path == blk_path {
-                        if let Some(s) = entry.file_name().to_str() {
-                            return s.to_string();
-                        }
-                    }
-                }
-            }
-        }
-    }
-    String::new()
-}
-
 fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {
     let mut event = event.clone();
-    if let Some(blk_info) = BlkInfo::new(&event.kdev) {
-        event.dev_wwid = uuid_of_blk(&blk_info.blk_path);
-        if event.dev_wwid.len() == 0 {
-            return;
-        }
-        event.dev_path = blk_info.blk_path.clone();
-        event.owners_wwids = blk_info.owners_wwids;
-        event.owners_paths = blk_info.owners_paths;
-        event.owners_wwids.insert(0, blk_info.wwid);
-        let mnt_pnt = get_mount_point(&blk_info.blk_path);
-        if mnt_pnt.len() != 0 {
-            {
-                event.msg = format!(
-                    "{}, dev_path: '{}', mount point: '{}'",
-                    event.raw_msg, event.dev_path, mnt_pnt
-                )
-            }
+    match BlkInfo::new(&event.kdev) {
+        Ok(blk_info) => {
+            let uuid = match blk_info.uuid {
+                Some(u) => u,
+                None => {
+                    println!(
+                        "fs_parser: Failed to find uuid of block {}",
+                        &event.kdev
+                    );
+                    return;
+                }
+            };
+            event.msg = format!(
+                "{}, uuid: '{}', blk_wwid: '{}', blk_path: '{}'",
+                event.raw_msg,
+                uuid,
+                blk_info.wwid,
+                blk_info.blk_path,
+            );
 
+            if let Some(mnt_pnt) = blk_info.mount_point {
+                event.msg = format!(
+                    "{}, mount_point: '{}'",
+                    event.msg, mnt_pnt
+                );
+                event
+                    .extension
+                    .insert("mount_point".to_string(), mnt_pnt.clone());
+            }
+            event.dev_path = blk_info.blk_path.clone();
+            event.owners_wwids = blk_info.owners_wwids;
+            event.owners_paths = blk_info.owners_paths;
+            event.owners_wwids.insert(0, blk_info.wwid);
+            event.owners_paths.insert(0, blk_info.blk_path);
             event
                 .extension
-                .insert("mount_point".to_string(), mnt_pnt.clone());
-        }
-        event.owners_paths.insert(0, blk_info.blk_path);
-        if event.event_type.len() != 0 {
-            event.msg = format!(
-                "{} uuid: '{}', dev_wwid: '{}'",
-                event.raw_msg, event.dev_wwid, event.owners_wwids[0]
-            );
-            if event.dev_path.len() != 0 {
-                event
-                    .msg
-                    .push_str(&format!(" dev_path: '{}'", event.dev_path));
-            }
-            if mnt_pnt.len() != 0 {
-                event
-                    .msg
-                    .push_str(&format!(" mount_point: '{}'", mnt_pnt));
-            }
-        }
+                .insert("uuid".to_string(), uuid.clone());
+            event.dev_wwid = uuid;
 
-        if let Err(e) = sender.send(event) {
-            println!("fs_parser: Failed to send event: {}", e);
+            if let Err(e) = sender.send(event) {
+                println!("fs_parser: Failed to send event: {}", e);
+            }
         }
+        Err(e) => println!("fs_parser: {}", e),
     }
 }
 
@@ -123,42 +75,4 @@ pub fn parser_start(sender: Sender<StorageEvent>) -> ParserInfo {
         filter_event_type: filter_event_type,
         filter_event_subsys: Some(filter_event_subsys),
     }
-}
-
-fn get_mount_point(blk_path: &str) -> String {
-    let mut ret = String::new();
-    let fd = unsafe {
-        libc::setmntent(
-            CStr::from_bytes_with_nul(b"/proc/mounts\0")
-                .expect("BUG: get_mount_point()")
-                // ^We never panic as it is null terminated.
-                .as_ptr(),
-            CStr::from_bytes_with_nul(b"r\0")
-                .expect("BUG")
-                .as_ptr(),
-            // ^We never panic as it is null terminated.
-        )
-    };
-    if fd.is_null() {
-        return ret;
-    }
-    let mut entry = unsafe { libc::getmntent(fd) };
-    while !entry.is_null() {
-        let table: libc::mntent = unsafe { *entry };
-        if let Ok(mnt_fsname) =
-            unsafe { CStr::from_ptr(table.mnt_fsname).to_str() }
-        {
-            if mnt_fsname == blk_path {
-                if let Ok(s) =
-                    unsafe { CString::from_raw(table.mnt_dir).into_string() }
-                {
-                    ret = s;
-                    break;
-                }
-            }
-            entry = unsafe { libc::getmntent(fd) };
-        }
-    }
-    unsafe { libc::endmntent(fd) };
-    return ret;
 }

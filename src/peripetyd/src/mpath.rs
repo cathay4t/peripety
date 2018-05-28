@@ -1,5 +1,5 @@
-use data::{BlkInfo, BlkType, EventType, ParserInfo, Sysfs};
-use peripety::{StorageEvent, StorageSubSystem};
+use data::{EventType, ParserInfo, Sysfs};
+use peripety::{BlkInfo, BlkType, StorageEvent, StorageSubSystem};
 use regex::Regex;
 use std::collections::HashMap;
 use std::fs;
@@ -284,16 +284,24 @@ fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {
                     return;
                 }
             };
-            if let Some(blk_info) = BlkInfo::new(&dm_name) {
-                event.owners_wwids = blk_info.owners_wwids;
-                event.owners_paths = blk_info.owners_paths;
-                if blk_info.blk_type == BlkType::Scsi {
-                    // Check for iSCSI/FC/FCoE informations.
-                    for (key, value) in get_transport_info(&blk_info.blk_path) {
-                        event.extension.insert(key, value);
+            match BlkInfo::new(&dm_name) {
+                Ok(blk_info) => {
+                    event.owners_wwids = blk_info.owners_wwids;
+                    event.owners_paths = blk_info.owners_paths;
+                    if blk_info.blk_type == BlkType::Scsi {
+                        // Check for iSCSI/FC/FCoE informations.
+                        for (key, value) in
+                            get_transport_info(&blk_info.blk_path)
+                        {
+                            event.extension.insert(key, value);
+                        }
                     }
                 }
-            }
+                Err(e) => {
+                    println!("mpath_parser: {}", e);
+                    return;
+                }
+            };
             event.extension.insert(
                 "blk_major_minor".to_string(),
                 event.kdev.clone(),

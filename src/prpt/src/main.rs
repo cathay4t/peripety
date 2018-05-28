@@ -12,7 +12,7 @@ extern crate sdjournal;
 use chrono::{DateTime, Local, TimeZone};
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use nix::sys::select::FdSet;
-use peripety::{LogSeverity, StorageEvent, StorageSubSystem};
+use peripety::{BlkInfo, LogSeverity, StorageEvent, StorageSubSystem};
 use std::os::unix::io::AsRawFd;
 use std::process::exit;
 
@@ -22,16 +22,7 @@ struct CliOpt {
     sub_systems: Option<Vec<StorageSubSystem>>,
     event_types: Option<Vec<String>>,
     since: Option<u64>,
-    fmt_type: OutputFormat,
-}
-
-arg_enum!{
-    #[derive(Debug, Clone)]
-    enum OutputFormat {
-        Json,
-        JsonPretty,
-        Basic
-    }
+    is_json: bool,
 }
 
 arg_enum!{
@@ -49,7 +40,7 @@ arg_enum!{
 }
 
 fn quit_with_msg(msg: &str) {
-    println!("{}", msg);
+    println!("Error: {}", msg);
     exit(1);
 }
 
@@ -59,7 +50,7 @@ fn arg_match_to_cliopt(matches: &ArgMatches) -> CliOpt {
         sub_systems: None,
         event_types: None,
         since: None,
-        fmt_type: OutputFormat::Basic,
+        is_json: false,
     };
     if matches.is_present("severity") {
         match matches.value_of("severity") {
@@ -119,8 +110,8 @@ fn arg_match_to_cliopt(matches: &ArgMatches) -> CliOpt {
             None => quit_with_msg("Invalid since"),
         }
     }
-    ret.fmt_type = value_t!(matches.value_of("format"), OutputFormat)
-        .unwrap_or_else(|e| e.exit());
+
+    ret.is_json = matches.is_present("J");
     return ret;
 }
 
@@ -145,37 +136,26 @@ fn handle_event(event: &StorageEvent, cli_opt: &CliOpt) {
     }
 
     if is_match {
-        match cli_opt.fmt_type {
-            OutputFormat::Basic => {
-                let ts = DateTime::parse_from_rfc3339(&event.timestamp)
-                    .expect("BUG: DateTime::parse_from_rfc3339()")
-                    .with_timezone(&Local)
-                    .to_rfc2822();
-                let mut msg = &event.raw_msg;
-                if event.msg.len() != 0 {
-                    msg = &event.msg;
-                }
-                println!(
-                    "{} {} {} {}",
-                    ts, event.hostname, event.sub_system, msg
-                )
+        if cli_opt.is_json {
+            println!(
+                "{}",
+                event
+                    .to_json_string_pretty()
+                    .expect("BUG: event.to_json_string_pretty()")
+            );
+        } else {
+            let ts = DateTime::parse_from_rfc3339(&event.timestamp)
+                .expect("BUG: DateTime::parse_from_rfc3339()")
+                .with_timezone(&Local)
+                .to_rfc2822();
+            let mut msg = &event.raw_msg;
+            if event.msg.len() != 0 {
+                msg = &event.msg;
             }
-            OutputFormat::Json => {
-                println!(
-                    "{}",
-                    event
-                        .to_json_string()
-                        .expect("BUG: event.to_json_string()")
-                );
-            }
-            OutputFormat::JsonPretty => {
-                println!(
-                    "{}",
-                    event
-                        .to_json_string_pretty()
-                        .expect("BUG: event.to_json_string_pretty()")
-                );
-            }
+            println!(
+                "{} {} {} {}",
+                ts, event.hostname, event.sub_system, msg
+            )
         }
     }
 }
@@ -261,6 +241,37 @@ fn handle_query(cli_opt: &CliOpt) {
     }
 }
 
+fn handle_info(blk: &str, is_json: bool) {
+    match BlkInfo::new(blk) {
+        Ok(i) => {
+            if is_json {
+                println!(
+                    "{}",
+                    i.to_json_string_pretty()
+                        .expect("BUG: handle_info()")
+                );
+            } else {
+                println!("blk_path     : {}", i.blk_path);
+                println!("blk_type     : {}", i.blk_type);
+                println!("wwid         : {}", i.wwid);
+                println!("owners_wwids : {:?}", i.owners_wwids);
+                println!("owners_paths : {:?}", i.owners_paths);
+                let mut types = Vec::new();
+                for t in i.owners_types {
+                    types.push(format!("{}", t));
+                }
+                println!("owners_types : {:?}", types);
+                println!("uuid         : {}", i.uuid.unwrap_or("".to_string()));
+                println!(
+                    "mount_point  : {}",
+                    i.mount_point.unwrap_or("".to_string())
+                );
+            }
+        }
+        Err(e) => quit_with_msg(&format!("{}", e)),
+    };
+}
+
 fn main() {
     let sev_arg = Arg::from_usage(
         "--severity=[SEVERITY] 'Only show event with equal or higher severity'",
@@ -279,10 +290,7 @@ fn main() {
          repeated'",
     );
 
-    let fmt_arg = Arg::from_usage("--format [FORMAT] 'Event output format'")
-        .possible_values(&OutputFormat::variants())
-        .case_insensitive(true)
-        .default_value("Basic");
+    let json_arg = Arg::from_usage("-J 'Use json format'");
 
     let matches = App::new("Peripety CLI")
         .version("0.1")
@@ -292,7 +300,7 @@ fn main() {
         .subcommand(
             SubCommand::with_name("monitor")
                 .about("Monitor following up events")
-                .arg(&fmt_arg)
+                .arg(&json_arg)
                 .arg(&sev_arg)
                 .arg(&evt_arg)
                 .arg(&sub_arg),
@@ -300,7 +308,7 @@ fn main() {
         .subcommand(
             SubCommand::with_name("query")
                 .about("Query saved events")
-                .arg(&fmt_arg)
+                .arg(&json_arg)
                 .arg(&sev_arg)
                 .arg(&evt_arg)
                 .arg(&sub_arg)
@@ -309,6 +317,16 @@ fn main() {
                      'Only show event on or newer than the specified \
                      date, format is ISO 8601: 2018-05-21'",
                 )),
+        )
+        .subcommand(
+            SubCommand::with_name("info")
+                .about("Query block information")
+                .arg(Arg::from_usage(
+                    "<blk> 'Block to query, could be \'major:minor\', \
+                     block name, block path, symbolic link to block, \
+                     uuid, wwid, or fs mount point'",
+                ))
+                .arg(&json_arg),
         )
         .get_matches();
 
@@ -321,6 +339,15 @@ fn main() {
     if let Some(matches) = matches.subcommand_matches("query") {
         let cli_opt = arg_match_to_cliopt(&matches);
         handle_query(&cli_opt);
+        exit(0);
+    }
+
+    if let Some(matches) = matches.subcommand_matches("info") {
+        let is_json = matches.is_present("J");
+        match matches.value_of("blk") {
+            Some(s) => handle_info(s, is_json),
+            None => quit_with_msg("Invalid 'blk' argument"),
+        }
         exit(0);
     }
 }

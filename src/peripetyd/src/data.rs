@@ -1,7 +1,5 @@
-use dm;
 use peripety::{StorageEvent, StorageSubSystem};
 use regex::Regex;
-use scsi;
 use std::fs;
 use std::io::Read;
 use std::sync::mpsc::Sender;
@@ -56,108 +54,9 @@ impl<'a> RegexConfStr<'a> {
     }
 }
 
-#[derive(Clone, PartialEq, Debug)]
-pub enum BlkType {
-    Scsi,
-    Dm,
-    DmMultipath,
-    DmLvm,
-    Partition,
-}
-
-#[derive(Debug)]
-pub struct BlkInfo {
-    pub wwid: String,
-    pub blk_type: BlkType,
-    pub blk_path: String,
-    pub owners_wwids: Vec<String>,
-    pub owners_types: Vec<BlkType>,
-    pub owners_paths: Vec<String>,
-}
-
-impl BlkInfo {
-    pub fn new(kdev: &str) -> Option<BlkInfo> {
-        // dm-0
-        if kdev.starts_with("dm-") {
-            return dm::blk_info_get_dm(kdev);
-        }
-
-        // sdb
-        if kdev.starts_with("sd") {
-            return scsi::blk_info_get_scsi(kdev);
-        }
-
-        // scsi_id: 4:0:1:1
-        if let Ok(reg) = Regex::new(r"^(?:[0-9]+:){3}[0-9]+$") {
-            if reg.is_match(kdev) {
-                return scsi::blk_info_get_scsi(kdev);
-            }
-        }
-
-        // major: minor
-        if let Ok(reg) = Regex::new(r"^[0-9]+:[0-9]+$") {
-            if reg.is_match(kdev) {
-                if let Some(n) = Sysfs::major_minor_to_blk_name(kdev) {
-                    return BlkInfo::new(&n);
-                }
-            }
-        }
-        None
-    }
-}
-
 pub struct Sysfs;
 
 impl Sysfs {
-    pub fn major_minor_to_blk_name(major_minor: &str) -> Option<String> {
-        let sysfs_path = format!("/sys/dev/block/{}", major_minor);
-        match fs::read_link(&sysfs_path) {
-            // We don't do unicode check there as this are used internally
-            // where no such non-utf8 concern.
-            Ok(p) => {
-                if let Some(p) = p.file_name() {
-                    if let Some(s) = p.to_str() {
-                        return Some(s.to_string());
-                    }
-                }
-            }
-            Err(e) => {
-                println!(
-                    "Sysfs::major_minor_to_blk_name(): \
-                     Failed to read link {}: {}",
-                    sysfs_path, e
-                );
-                return None;
-            }
-        };
-        None
-    }
-
-    pub fn scsi_id_to_blk_name(scsi_id: &str) -> String {
-        let sysfs_path =
-            format!("/sys/class/scsi_disk/{}/device/block", scsi_id);
-        let mut blks = match fs::read_dir(&sysfs_path) {
-            Ok(b) => b,
-            Err(e) => {
-                println!(
-                    "Sysfs::scsi_id_to_blk_name(): Failed to read_dir {}: {}",
-                    sysfs_path, e
-                );
-                return String::new();
-            }
-        };
-        if let Some(Ok(blk)) = blks.next() {
-            // Assuming sysfs are all utf8 filenames for block layer.
-            if let Some(n) = blk.path().file_name() {
-                if let Some(s) = n.to_str() {
-                    return s.to_string();
-                }
-            }
-        }
-
-        String::new()
-    }
-
     pub fn scsi_id_of_disk(name: &str) -> Option<String> {
         let sysfs_path = format!("/sys/block/{}/device", name);
         match fs::read_link(&sysfs_path) {

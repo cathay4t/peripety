@@ -7,12 +7,10 @@ extern crate sdjournal;
 extern crate serde_derive;
 extern crate toml;
 extern crate chrono;
-extern crate libc;
 
 mod collector;
 mod conf;
 mod data;
-mod dm;
 mod fs;
 mod mpath;
 mod scsi;

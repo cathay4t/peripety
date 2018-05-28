@@ -1,42 +1,58 @@
-extern crate peripety;
-extern crate regex;
+use super::blk_info::{BlkInfo, BlkType};
+use super::error::PeripetyError;
+use super::sysfs::Sysfs;
 
-use data::{BlkInfo, BlkType, Sysfs};
 use std::ffi::OsStr;
 use std::fs;
 use std::path::Path;
 
+pub(crate) fn get_holder_dm_name(blk: &str) -> Option<String> {
+    let holders = format!("/sys/block/{}/holders", blk);
+    if let Ok(mut entries) = fs::read_dir(&holders) {
+        if let Some(Ok(holder)) = entries.next() {
+            if let Some(n) = holder.path().file_name() {
+                if let Some(s) = n.to_str() {
+                    if s.starts_with("dm-") {
+                        return Some(s.to_string());
+                    }
+                }
+            }
+        }
+    }
+    None
+}
+
 // Support query on these formats:
 //  * dm-0
-pub fn blk_info_get_dm(kdev: &str) -> Option<BlkInfo> {
-    // TODO Check if partition
-    let sysfs_uuid = format!("/sys/block/{}/dm/uuid", &kdev);
+pub(crate) fn blk_info_get_dm(blk: &str) -> Result<BlkInfo, PeripetyError> {
+    let sysfs_uuid = format!("/sys/block/{}/dm/uuid", &blk);
 
     if Path::new(&sysfs_uuid).exists() {
-        let sysfs_name = format!("/sys/block/{}/dm/name", &kdev);
-        let name = Sysfs::read(&sysfs_name);
+        let sysfs_name = format!("/sys/block/{}/dm/name", &blk);
+        let name = Sysfs::read(&sysfs_name)?;
         let mut ret = BlkInfo {
-            wwid: Sysfs::read(&sysfs_uuid),
+            wwid: Sysfs::read(&sysfs_uuid)?,
             blk_type: BlkType::Dm,
             blk_path: format!("/dev/mapper/{}", &name),
             owners_wwids: Vec::new(),
             owners_types: Vec::new(),
             owners_paths: Vec::new(),
+            uuid: None,
+            mount_point: None,
         };
         if ret.wwid.starts_with("LVM-") {
             ret.blk_type = BlkType::DmLvm;
         } else if ret.wwid.starts_with("mpath-") {
             ret.blk_type = BlkType::DmMultipath;
         }
-        let slave_dir = format!("/sys/block/{}/slaves", &kdev);
+        let slave_dir = format!("/sys/block/{}/slaves", &blk);
         let entries = match fs::read_dir(&slave_dir) {
             Ok(e) => e,
             Err(e) => {
-                println!(
-                    "dm_parser: Failed to read_dir {}: {}",
+                return Err(PeripetyError::InternalBug(format!(
+                    "dm::blk_info_get_dm(): Failed to read_dir {}: {}",
                     slave_dir, e
-                );
-                return None;
+                )));
             }
         };
         for entry in entries {
@@ -44,11 +60,11 @@ pub fn blk_info_get_dm(kdev: &str) -> Option<BlkInfo> {
                 Ok(e) => e.file_name(),
                 Err(_) => continue,
             };
-            let slave_kdev = match f.to_str() {
+            let slave_blk = match f.to_str() {
                 Some(k) => k,
                 None => continue,
             };
-            if let Some(slave_info) = BlkInfo::new(slave_kdev) {
+            if let Ok(slave_info) = BlkInfo::new_skip_extra(slave_blk) {
                 if !ret.owners_wwids.contains(&slave_info.wwid) {
                     ret.owners_wwids.push(slave_info.wwid.clone());
                     ret.owners_types
@@ -63,11 +79,11 @@ pub fn blk_info_get_dm(kdev: &str) -> Option<BlkInfo> {
                     || slave_info.blk_type == BlkType::DmMultipath
                 {
                     for sub_slave_blk_path in slave_info.owners_paths {
-                        let sub_slave_kdev;
+                        let sub_slave_blk;
                         if let Ok(p) =
                             Path::new(&sub_slave_blk_path).canonicalize()
                         {
-                            sub_slave_kdev =
+                            sub_slave_blk =
                                 match p.file_name().and_then(OsStr::to_str) {
                                     Some(n) => n.to_string(),
                                     None => continue,
@@ -76,8 +92,8 @@ pub fn blk_info_get_dm(kdev: &str) -> Option<BlkInfo> {
                             continue;
                         }
 
-                        if let Some(sub_slave_info) =
-                            BlkInfo::new(&sub_slave_kdev)
+                        if let Ok(sub_slave_info) =
+                            BlkInfo::new_skip_extra(&sub_slave_blk)
                         {
                             if !ret.owners_wwids.contains(&sub_slave_info.wwid)
                             {
@@ -95,12 +111,17 @@ pub fn blk_info_get_dm(kdev: &str) -> Option<BlkInfo> {
             }
         }
         if ret.owners_wwids.len() == 0 {
-            return None;
+            return Err(PeripetyError::InternalBug(format!(
+                "dm::blk_info_get_dm() not supported blk {}",
+                blk
+            )));
         }
-        return Some(ret);
+        return Ok(ret);
     }
 
-    // TODO(Gris Ge): Handle partition
-
-    None
+    return Err(PeripetyError::InternalBug(format!(
+        "dm::blk_info_get_dm() \
+         not supported blk {} as path {} not exists",
+        blk, sysfs_uuid
+    )));
 }

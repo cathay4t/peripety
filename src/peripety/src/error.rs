@@ -1,0 +1,32 @@
+use std::fmt;
+
+#[derive(Debug, Clone)]
+pub enum PeripetyError {
+    LogSeverityParseError(String),
+    ConfError(String),
+    JsonSerializeError(String),
+    JsonDeserializeError(String),
+    NoSupport(String),
+    InternalBug(String),
+    BlockNoExists(String),
+    StorageSubSystemParseError(String),
+}
+
+impl fmt::Display for PeripetyError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            match *self {
+                PeripetyError::LogSeverityParseError(ref x)
+                | PeripetyError::ConfError(ref x)
+                | PeripetyError::JsonSerializeError(ref x)
+                | PeripetyError::JsonDeserializeError(ref x)
+                | PeripetyError::NoSupport(ref x)
+                | PeripetyError::InternalBug(ref x)
+                | PeripetyError::BlockNoExists(ref x)
+                | PeripetyError::StorageSubSystemParseError(ref x) => x,
+            }
+        )
+    }
+}
