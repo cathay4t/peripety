@@ -178,19 +178,9 @@ fn is_fc_host(host_id: &str) -> bool {
     Path::new(&format!("/sys/class/fc_host/host{}", host_id)).exists()
 }
 
-fn base_name(blk_path: &str) -> String {
-    Path::new(blk_path)
-        .file_name()
-        .expect("BUG: mpath_parser: base_name()")
-        .to_str()
-        .expect("BUG: mpath_parser: base_name()")
-        .to_string()
-}
-
-fn get_transport_info(blk_path: &str) -> HashMap<String, String> {
+fn get_scsi_transport_info(sd_name: &str) -> HashMap<String, String> {
     let mut ret = HashMap::new();
-    let blk_name = &base_name(blk_path);
-    let scsi_id = match Sysfs::scsi_id_of_disk(blk_name) {
+    let scsi_id = match Sysfs::scsi_id_of_disk(sd_name) {
         Some(s) => s,
         None => return ret,
     };
@@ -274,9 +264,16 @@ fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {
             let mut event = event.clone();
             event.dev_path = format!("/dev/mapper/{}", name);
             event.dev_wwid = uuid;
+            let path_blk_name =  match BlkInfo::major_minor_to_blk_name(&event.kdev) {
+                Ok(b) => b,
+                Err(e) => {
+                    println!("mpath_parser: {}", e);
+                    return;
+                },
+            };
             event.msg = format!(
-                "{} mpath_wwid: {}",
-                event.raw_msg, event.dev_wwid
+                "{} mpath_wwid: {}, path_blk_name: {}",
+                event.raw_msg, event.dev_wwid, path_blk_name
             );
             let dm_name = match get_dm_name(&event.dev_path) {
                 Some(d) => d,
@@ -288,17 +285,20 @@ fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {
                     return;
                 }
             };
+
             match BlkInfo::new(&dm_name) {
                 Ok(blk_info) => {
                     event.owners_wwids = blk_info.owners_wwids;
                     event.owners_paths = blk_info.owners_paths;
-                    if blk_info.blk_type == BlkType::Scsi {
-                        // Check for iSCSI/FC/FCoE informations.
-                        for (key, value) in
-                            get_transport_info(&blk_info.blk_path)
-                        {
-                            event.msg.push_str(&format!(", {}={}", key, value));
-                            event.extension.insert(key, value);
+                    if let Ok(pbi) = BlkInfo::new_skip_extra(&path_blk_name) {
+                        if pbi.blk_type == BlkType::Scsi {
+                            // Check for iSCSI/FC/FCoE informations.
+                            for (key, value) in
+                                get_scsi_transport_info(&path_blk_name)
+                            {
+                                event.msg.push_str(&format!(", {}={}", key, value));
+                                event.extension.insert(key, value);
+                            }
                         }
                     }
                 }

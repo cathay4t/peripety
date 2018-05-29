@@ -56,9 +56,7 @@ impl BlkInfo {
         Ok(bi)
     }
 
-    pub fn new_skip_extra(
-        blk: &str,
-    ) -> Result<BlkInfo, PeripetyError> {
+    pub fn new_skip_extra(blk: &str) -> Result<BlkInfo, PeripetyError> {
         return BlkInfo::_new(blk, true);
     }
 
@@ -119,7 +117,7 @@ impl BlkInfo {
         if let Ok(reg) = Regex::new(r"^[0-9]+:[0-9]+$") {
             if reg.is_match(blk) {
                 return BlkInfo::_new(
-                    &Sysfs::major_minor_to_blk_name(blk)?,
+                    &BlkInfo::major_minor_to_blk_name(blk)?,
                     skip_holder_check,
                 );
             }
@@ -266,5 +264,32 @@ impl BlkInfo {
             return None;
         }
         return Some(ret);
+    }
+
+    pub fn major_minor_to_blk_name(
+        major_minor: &str,
+    ) -> Result<String, PeripetyError> {
+        let sysfs_path = format!("/sys/dev/block/{}", major_minor);
+        match fs::read_link(&sysfs_path) {
+            Ok(p) => {
+                if let Some(p) = p.file_name() {
+                    if let Some(s) = p.to_str() {
+                        return Ok(s.to_string());
+                    }
+                }
+            }
+            Err(e) => {
+                return Err(PeripetyError::InternalBug(format!(
+                    "major_minor_to_blk_name(): \
+                     Failed to read link {}: {}",
+                    sysfs_path, e
+                )));
+            }
+        };
+
+        Err(PeripetyError::InternalBug(format!(
+            "major_minor_to_blk_name():  Got non-utf8 path {}",
+            sysfs_path
+        )))
     }
 }
