@@ -274,6 +274,10 @@ fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {
             let mut event = event.clone();
             event.dev_path = format!("/dev/mapper/{}", name);
             event.dev_wwid = uuid;
+            event.msg = format!(
+                "{} mpath_wwid: {}",
+                event.raw_msg, event.dev_wwid
+            );
             let dm_name = match get_dm_name(&event.dev_path) {
                 Some(d) => d,
                 None => {
@@ -293,6 +297,7 @@ fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {
                         for (key, value) in
                             get_transport_info(&blk_info.blk_path)
                         {
+                            event.msg.push_str(&format!(", {}={}", key, value));
                             event.extension.insert(key, value);
                         }
                     }
