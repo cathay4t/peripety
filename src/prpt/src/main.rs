@@ -1,7 +1,3 @@
-// prpt monitor --event-type <> --sub-system <> --wwid <> --level <>
-// prpt query --event-type <> --sub-system <> --wwid <> --level <>
-// prpt blkinfo /dev/sda
-//
 extern crate chrono;
 #[macro_use]
 extern crate clap;
@@ -22,6 +18,7 @@ struct CliOpt {
     sub_systems: Option<Vec<StorageSubSystem>>,
     event_types: Option<Vec<String>>,
     since: Option<u64>,
+    blk_info: Option<BlkInfo>,
     is_json: bool,
 }
 
@@ -50,6 +47,7 @@ fn arg_match_to_cliopt(matches: &ArgMatches) -> CliOpt {
         sub_systems: None,
         event_types: None,
         since: None,
+        blk_info: None,
         is_json: false,
     };
     if matches.is_present("severity") {
@@ -112,9 +110,28 @@ fn arg_match_to_cliopt(matches: &ArgMatches) -> CliOpt {
     }
 
     ret.is_json = matches.is_present("J");
+
+    if matches.is_present("blk") {
+        match matches.value_of("blk") {
+            Some(s) => {
+                ret.blk_info = match BlkInfo::new_skip_extra(&s) {
+                    Ok(b) => Some(b),
+                    Err(e) => {
+                        quit_with_msg(&format!("Invalid blk option: {}", e));
+                        None
+                    }
+                };
+            }
+            None => quit_with_msg("Invalid blk option"),
+        };
+    }
     return ret;
 }
 
+
+// TODO(Gris Ge): If performance is a concern and moving search to journal API
+//                add_match() could speed things up, we should do it.
+//                Need investigation.
 fn handle_event(event: &StorageEvent, cli_opt: &CliOpt) {
     let mut is_match = true;
 
@@ -131,6 +148,12 @@ fn handle_event(event: &StorageEvent, cli_opt: &CliOpt) {
 
     if let Some(ref ets) = cli_opt.event_types {
         if ets.len() != 0 && !ets.contains(&event.event_type) {
+            is_match = false;
+        }
+    }
+
+    if let Some(ref b) = cli_opt.blk_info {
+        if event.dev_wwid != b.wwid && !event.owners_wwids.contains(&b.wwid) {
             is_match = false;
         }
     }
@@ -261,7 +284,10 @@ fn handle_info(blk: &str, is_json: bool) {
                     types.push(format!("{}", t));
                 }
                 println!("owners_types : {:?}", types);
-                println!("uuid         : {}", i.uuid.unwrap_or("".to_string()));
+                println!(
+                    "uuid         : {}",
+                    i.uuid.unwrap_or("".to_string())
+                );
                 println!(
                     "mount_point  : {}",
                     i.mount_point.unwrap_or("".to_string())
@@ -289,6 +315,8 @@ fn main() {
          'Only show event with specific sub-system, argument could be \
          repeated'",
     );
+    let blk_arg =
+        Arg::from_usage("--blk=[BLOCK] 'Only show event with specific block'");
 
     let json_arg = Arg::from_usage("-J 'Use json format'");
 
@@ -303,7 +331,8 @@ fn main() {
                 .arg(&json_arg)
                 .arg(&sev_arg)
                 .arg(&evt_arg)
-                .arg(&sub_arg),
+                .arg(&sub_arg)
+                .arg(&blk_arg),
         )
         .subcommand(
             SubCommand::with_name("query")
@@ -312,6 +341,7 @@ fn main() {
                 .arg(&sev_arg)
                 .arg(&evt_arg)
                 .arg(&sub_arg)
+                .arg(&blk_arg)
                 .arg(Arg::from_usage(
                     "--since [SINCE] \
                      'Only show event on or newer than the specified \

@@ -33,7 +33,7 @@ impl fmt::Display for BlkType {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct BlkInfo {
     pub wwid: String,
     pub blk_type: BlkType,
