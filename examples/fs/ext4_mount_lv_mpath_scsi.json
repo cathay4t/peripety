@@ -4,7 +4,7 @@
   "sub_system": "FsExt4",
   "timestamp": 1526476997012691,
   "event_id": "",
-  "event_type": "DM_FS_MOUNTED",
+  "event_type": "FS_MOUNTED",
   "dev_wwid": "47841ee5-047d-4f73-8951-5a3d7a4c770e",
   "dev_path": "/dev/mapper/vg-lv",
   "owners_wwids": [
