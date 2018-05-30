@@ -1,0 +1,134 @@
+.TH PRPT "1" "May 2018" "prpt 0.1.0" "peripety"
+.SH NAME
+prpt - Peripety command line interface
+
+.SH SYNOPSIS
+.B prpt \fIsubcommand\fR [\fICOMMAND OPTIONS\fR]...
+
+.SH DESCRIPTION
+prpt is the command line tool for the peripety project.
+This tool allows users to:
+
+ * Retrieve block information. Example:
+
+    prpt info /dev/sda7
+
+ * Query existing peripety events. Example:
+
+    prpt query --since today -J
+
+
+ * Monitor follow up peripety events. Example:
+
+    prpt monitor --severity Error -J
+
+
+.SH SUBCOMMANDS
+.SS help
+Print help message.
+
+.SS info
+Query block information on specified block.
+The block string could be any of following forms:
+
+ * major:minor. E.g. "8:0".
+ * Block name. E.g. "sda", "dm-0".
+ * Full path of device path. E.g. "/dev/sda", "/dev/dm-0", "/dev/mapper/mpatha".
+ * UUID. E.g. "7ef54c0b-b81c-4d4b-8ed4-5297ec54fadd".
+ * WWID used by peripety events.
+
+Example:
+
+.nf
+    $ prpt info /dev/sda7
+    blk_path     : /dev/sda7
+    blk_type     : Partition
+    wwid         : t10.ATA-SAMSUNG-MZ7LN512HMJP-000L7-S2X9NX0H706455-part7
+    owners_wwids : ["t10.ATA-SAMSUNG-MZ7LN512HMJP-000L7-S2X9NX0H706455"]
+    owners_paths : ["/dev/sda"]
+    owners_types : ["SCSI"]
+    uuid         : f8c9b4e6-b762-49cb-aee5-1a70a748c8b0
+    mount_point  : /home
+.fi
+
+.SS query
+Query existing peripety events from journald. When multiple option are defined,
+only event matches all different options will be displayed.
+
+.TP 15
+\fB-J\fR
+Optional. Display events in JSON format. If not defined, display the event
+message only with timestamp only.
+Each event is devided by an empty line.
+
+.TP
+\fB--blk\fR \fI<BLOCK>\fR
+Optional. Only show event related to specified block. Support all types of
+string used by above \fBinfo\fR subcommand.
+
+.TP
+\fB--event-type\fR \fI<EVENT-TYPE>\fR...
+Optional. Repeatable. Only show event with specified event type.
+If you are interested on multiple event types, you may repeat this option.
+
+.TP
+\fB--severity\fR \fI<SEVERITY>\fR...
+Optional. Only show event with equal or higher severity. If not defined,
+show all event.
+
+Possible values are(severity high to low): \fBEmergency\fR, \fBAlert\fR,
+\fBCtritical\fR, \fBError\fR, \fBWarning\fR, \fBNotice\fR, \fBInfo\fr,
+\fBDebug\fR.
+
+.TP
+\fB--since\fR \fI<SINCE>\fR...
+Optional. Only show event on or newer than the specified time.
+The supported formats are "2018-05-21" or "today", "yesterday" or
+"2012-10-30 18:17:16".
+
+.TP
+\fB--sub-system\fR \fI<SUB-SYSTEM>\fR...
+Optional. Only show event from specific sub-system
+The supported formats are "2018-05-21" or "today", "yesterday" or
+"2012-10-30 18:17:16".
+If you are interested on multiple sub-system, you may repeat this option.
+
+.SS monitor
+Monitor follow up peripety events.
+
+.TP 15
+\fB-J\fR
+Optional. Display events in JSON format. If not defined, display the event
+message only with timestamp only.
+Each event is devided by an empty line.
+
+\fB--blk\fR \fI<BLOCK>\fR
+Optional. Only show event related to specified block. Support all types of
+string used by above \fBinfo\fR subcommand.
+
+.TP
+\fB--event-type\fR \fI<EVENT-TYPE>\fR...
+Optional. Repeatable. Only show event with specified event type.
+If you are interested on multiple event types, you may repeat this option.
+
+.TP
+\fB--severity\fR \fI<SEVERITY>\fR...
+Optional. Only show event with equal or higher severity. If not defined,
+show all event.
+
+Possible values are(severity high to low): \fBEmergency\fR, \fBAlert\fR,
+\fBCtritical\fR, \fBError\fR, \fBWarning\fR, \fBNotice\fR, \fBInfo\fr,
+\fBDebug\fR.
+
+.TP
+\fB--sub-system\fR \fI<SUB-SYSTEM>\fR...
+Optional. Only show event from specific sub-system
+The supported formats are "2018-05-21" or "today", "yesterday" or
+"2012-10-30 18:17:16".
+If you are interested on multiple sub-system, you may repeat this option.
+
+.SH BUGS
+Please report bugs to
+\fIhttps://github.com/cathay4t/peripety/issues\fR
+.SH AUTHOR
+Gris Ge \fI<fge@redhat.com>\fR

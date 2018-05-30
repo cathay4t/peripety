@@ -376,7 +376,7 @@ fn main() {
     );
     let sub_arg = Arg::from_usage(
         "--sub-system=[SUB-SYSTEM]... \
-         'Only show event with specific sub-system, argument could be \
+         'Only show event from specific sub-system, argument could be \
          repeated'",
     );
     let blk_arg =
@@ -409,7 +409,7 @@ fn main() {
                 .arg(Arg::from_usage(
                     "--since [SINCE] \
                      'Only show event on or newer than the specified \
-                     time, format is \"2018-05-21\" or \"today\", \
+                     time, supported formats are \"2018-05-21\" or \"today\", \
                      \"yesterday\" or \"2012-10-30 18:17:16\".",
                 )),
         )
