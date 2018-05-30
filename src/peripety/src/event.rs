@@ -49,6 +49,7 @@ pub enum StorageSubSystem {
     LvmThin,
     Multipath,
     FsExt4,
+    FsJbd2, // The generic journaling layer for block used by ext4 and ocfs2.
     FsXfs,
     Nvme,
 }
@@ -81,6 +82,7 @@ impl fmt::Display for StorageSubSystem {
             StorageSubSystem::LvmThin => write!(fmt, "LVM-ThinProvisioning"),
             StorageSubSystem::Multipath => write!(fmt, "Multipath"),
             StorageSubSystem::FsExt4 => write!(fmt, "ext4"),
+            StorageSubSystem::FsJbd2 => write!(fmt, "jbd2"),
             StorageSubSystem::FsXfs => write!(fmt, "xfs"),
             StorageSubSystem::Nvme => write!(fmt, "NVMe"),
         }

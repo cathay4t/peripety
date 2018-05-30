@@ -1,3 +1,31 @@
+// Copyright (C) 2018 Red Hat, Inc.
+//
+// Permission is hereby granted, free of charge, to any
+// person obtaining a copy of this software and associated
+// documentation files (the "Software"), to deal in the
+// Software without restriction, including without
+// limitation the rights to use, copy, modify, merge,
+// publish, distribute, sublicense, and/or sell copies of
+// the Software, and to permit persons to whom the Software
+// is furnished to do so, subject to the following
+// conditions:
+//
+// The above copyright notice and this permission notice
+// shall be included in all copies or substantial portions
+// of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+// ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+// TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+// PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+// SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+// CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+// OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+// IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+// DEALINGS IN THE SOFTWARE.
+//
+// Author: Gris Ge <fge@redhat.com>
+
 extern crate chrono;
 #[macro_use]
 extern crate clap;
@@ -5,7 +33,7 @@ extern crate nix;
 extern crate peripety;
 extern crate sdjournal;
 
-use chrono::{DateTime, Local, TimeZone};
+use chrono::{DateTime, Local, TimeZone, Datelike, Duration};
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use nix::sys::select::FdSet;
 use peripety::{BlkInfo, LogSeverity, StorageEvent, StorageSubSystem};
@@ -39,6 +67,45 @@ arg_enum!{
 fn quit_with_msg(msg: &str) {
     println!("Error: {}", msg);
     exit(1);
+}
+
+fn time_str_to_u64(time_str: &str) -> Option<u64> {
+    if let Ok(t) = Local.datetime_from_str(time_str, "%F %H:%M:%S") {
+        Some(
+            t.timestamp() as u64 * 10u64.pow(6)
+                + u64::from(t.timestamp_subsec_micros()),
+        )
+    } else {
+        None
+    }
+}
+
+fn since_cliopt_to_journald_timestamp(since: &str) -> Option<u64> {
+    if since == "today" {
+        let dt = Local::now();
+        return time_str_to_u64(&format!(
+            "{}-{}-{} 00:00:00",
+            dt.year(),
+            dt.month(),
+            dt.day()
+        ));
+    }
+
+    if since == "yesterday" {
+        let dt = Local::now() - Duration::days(1);
+        return time_str_to_u64(&format!(
+            "{}-{}-{} 00:00:00",
+            dt.year(),
+            dt.month(),
+            dt.day()
+        ));
+    }
+
+    if since.contains(':') {
+        return time_str_to_u64(since);
+    }
+
+    time_str_to_u64(&format!("{} 00:00:00", since))
 }
 
 fn arg_match_to_cliopt(matches: &ArgMatches) -> CliOpt {
@@ -93,16 +160,13 @@ fn arg_match_to_cliopt(matches: &ArgMatches) -> CliOpt {
     }
     if matches.is_present("since") {
         match matches.value_of("since") {
-            Some(s) => match Local
-                .datetime_from_str(&format!("{} 00:00:00", s), "%F %H:%M:%S")
+            Some(s) => match since_cliopt_to_journald_timestamp(s)
             {
-                Ok(t) => {
-                    let timestamp = (t.timestamp() as u64) * 10u64.pow(6)
-                        + u64::from(t.timestamp_subsec_micros());
-                    ret.since = Some(timestamp);
+                Some(t) => {
+                    ret.since = Some(t);
                 }
-                Err(e) => {
-                    quit_with_msg(&format!("Failed to parse --since: {}", e))
+                None => {
+                    quit_with_msg(&format!("Invalid --since option"))
                 }
             },
             None => quit_with_msg("Invalid since"),
@@ -127,7 +191,6 @@ fn arg_match_to_cliopt(matches: &ArgMatches) -> CliOpt {
     }
     ret
 }
-
 
 // TODO(Gris Ge): If performance is a concern and moving search to journal API
 //                add_match() could speed things up, we should do it.
@@ -161,7 +224,7 @@ fn handle_event(event: &StorageEvent, cli_opt: &CliOpt) {
     if is_match {
         if cli_opt.is_json {
             println!(
-                "{}",
+                "{}\n",
                 event
                     .to_json_string_pretty()
                     .expect("BUG: event.to_json_string_pretty()")
@@ -171,7 +234,11 @@ fn handle_event(event: &StorageEvent, cli_opt: &CliOpt) {
                 .expect("BUG: DateTime::parse_from_rfc3339()")
                 .with_timezone(&Local)
                 .to_rfc2822();
-            let msg = if !event.msg.is_empty() { &event.msg } else { &event.raw_msg };
+            let msg = if !event.msg.is_empty() {
+                &event.msg
+            } else {
+                &event.raw_msg
+            };
             println!(
                 "{} {} {} {}",
                 ts, event.hostname, event.sub_system, msg
@@ -342,7 +409,8 @@ fn main() {
                 .arg(Arg::from_usage(
                     "--since [SINCE] \
                      'Only show event on or newer than the specified \
-                     date, format is ISO 8601: 2018-05-21'",
+                     time, format is \"2018-05-21\" or \"today\", \
+                     \"yesterday\" or \"2012-10-30 18:17:16\".",
                 )),
         )
         .subcommand(

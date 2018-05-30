@@ -100,10 +100,40 @@ pub const BUILD_IN_REGEX_CONFS: &[RegexConfStr] = &[
         regex: r"(?x)
                 ^EXT4-fs\s
                 \((?P<kdev>[^\s\)]+)\):\s
-                mounted\ filesystem\s
+                mounted\ filesystem\ with(?P<data_mode>.+).\s
+                Opts:\ (?P<opts>.+)$
                 ",
         sub_system: "ext4",
         event_type: "FS_MOUNTED",
+    },
+    RegexConfStr {
+        starts_with: Some("EXT4-fs "),
+        regex: r"(?x)
+                ^EXT4-fs\s
+                \((?P<kdev>[^\s\)]+)\):\s
+                Remounting\ filesystem\ read-only$
+                ",
+        sub_system: "ext4",
+        event_type: "FS_REMOUNT_READ_ONLY",
+    },
+    RegexConfStr {
+        starts_with: Some("EXT4-fs (device "),
+        regex: r"(?x)
+                ^EXT4-fs\s
+                \(device\ (?P<kdev>[^\s\)]+)\):\s
+                panic forced after error
+                ",
+        sub_system: "ext4",
+        event_type: "FS_PANIC",
+    },
+    RegexConfStr {
+        starts_with: Some("EXT4-fs error (device "),
+        regex: r"(?x)
+                ^EXT4-fs\ error\s
+                \(device\ (?P<kdev>[^\s\)]+)\):\s
+                ",
+        sub_system: "ext4",
+        event_type: "FS_ERROR",
     },
     RegexConfStr {
         starts_with: Some("XFS "),
@@ -150,7 +180,7 @@ pub const BUILD_IN_REGEX_CONFS: &[RegexConfStr] = &[
                 Detected\ IO\ errors\ while\ flushing\ file\ data\ on\s
                 (?P<kdev>[^\s]+)-[0-9]+$
                 ",
-        sub_system: "ext4",
+        sub_system: "jbd2",
         event_type: "FS_IO_ERROR",
     },
 ];

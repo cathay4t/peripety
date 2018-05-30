@@ -8,4 +8,3 @@
  * Support multipathd user space logs.
  * Support better daemon logging -- info/debug/warnning/error.
  * Log udev add/change/del action of block.
- * Allow user defined regex to have named group value save to extention dict.

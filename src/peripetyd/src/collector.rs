@@ -57,9 +57,8 @@ fn process_journal_entry(
     // we can do that when kernel provide better structured log.
 
     if let Some(s) = entry.get("_KERNEL_SUBSYSTEM") {
-        match s.parse::<StorageSubSystem>() {
-            Ok(s) => event.sub_system = s,
-            Err(e) => println!("collector: {}", e),
+        if let Ok(s) = s.parse::<StorageSubSystem>() {
+            event.sub_system = s;
         }
     }
     if let Some(d) = entry.get("_KERNEL_DEVICE") {
