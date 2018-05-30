@@ -103,7 +103,7 @@ pub const BUILD_IN_REGEX_CONFS: &[RegexConfStr] = &[
                 mounted\ filesystem\s
                 ",
         sub_system: "ext4",
-        event_type: "DM_FS_MOUNTED",
+        event_type: "FS_MOUNTED",
     },
     RegexConfStr {
         starts_with: Some("XFS "),
@@ -112,7 +112,7 @@ pub const BUILD_IN_REGEX_CONFS: &[RegexConfStr] = &[
                 \((?P<kdev>[^\s\)]+)\):\s
                 Ending\ clean\ mount",
         sub_system: "xfs",
-        event_type: "DM_FS_MOUNTED",
+        event_type: "FS_MOUNTED",
     },
     RegexConfStr {
         starts_with: Some("XFS "),
@@ -121,7 +121,7 @@ pub const BUILD_IN_REGEX_CONFS: &[RegexConfStr] = &[
                 \((?P<kdev>[^\s\)]+)\):\s
                 Unmounting\ Filesystem$",
         sub_system: "xfs",
-        event_type: "DM_FS_UNMOUNTED",
+        event_type: "FS_UNMOUNTED",
     },
     RegexConfStr {
         starts_with: Some("XFS "),
@@ -130,7 +130,7 @@ pub const BUILD_IN_REGEX_CONFS: &[RegexConfStr] = &[
                 \((?P<kdev>[^\s\)]+)\):\s
                 writeback\ error\ on\ sector",
         sub_system: "xfs",
-        event_type: "DM_FS_IO_ERROR",
+        event_type: "FS_IO_ERROR",
     },
     RegexConfStr {
         starts_with: Some("EXT4-fs "),
@@ -141,7 +141,7 @@ pub const BUILD_IN_REGEX_CONFS: &[RegexConfStr] = &[
                 ext4_end_bio:[0-9]+:\ I/O\ error
                 ",
         sub_system: "ext4",
-        event_type: "DM_FS_IO_ERROR",
+        event_type: "FS_IO_ERROR",
     },
     RegexConfStr {
         starts_with: Some("JBD2: "),
@@ -151,6 +151,6 @@ pub const BUILD_IN_REGEX_CONFS: &[RegexConfStr] = &[
                 (?P<kdev>[^\s]+)-[0-9]+$
                 ",
         sub_system: "ext4",
-        event_type: "DM_FS_IO_ERROR",
+        event_type: "FS_IO_ERROR",
     },
 ];
