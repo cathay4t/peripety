@@ -54,7 +54,7 @@ make run
 
 ```bash
 # You may remove the `sudo` if in `systemd-journal` group.
-sudo ./target/debug/prpt monitor --format JsonPretty
+sudo ./target/debug/prpt monitor -J
 ```
 
  * Trigger some events
