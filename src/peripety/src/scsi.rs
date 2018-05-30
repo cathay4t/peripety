@@ -107,8 +107,8 @@ pub(crate) fn blk_info_get_scsi(blk: &str) -> Result<BlkInfo, PeripetyError> {
         });
     }
 
-    return Err(PeripetyError::InternalBug(format!(
+    Err(PeripetyError::InternalBug(format!(
         "scsi::blk_info_get_scsi(): Got invalid scsi blk {}",
         blk
-    )));
+    )))
 }

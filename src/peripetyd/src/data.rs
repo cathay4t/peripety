@@ -79,7 +79,7 @@ impl Sysfs {
     }
 
     pub fn scsi_host_id_of_scsi_id(scsi_id: &str) -> Option<String> {
-        if let Some(index) = scsi_id.find(":") {
+        if let Some(index) = scsi_id.find(':') {
             return Some(scsi_id[..index].to_string());
         }
 
@@ -96,7 +96,7 @@ impl Sysfs {
                         path, e
                     );
                 }
-                if contents.ends_with("\n") {
+                if contents.ends_with('\n') {
                     contents.pop();
                 }
             }

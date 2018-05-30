@@ -15,7 +15,7 @@ impl Sysfs {
                         path, e
                     )));
                 }
-                if contents.ends_with("\n") {
+                if contents.ends_with('\n') {
                     contents.pop();
                 }
             }

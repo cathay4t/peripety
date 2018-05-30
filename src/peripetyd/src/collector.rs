@@ -21,12 +21,12 @@ use data::RegexConf;
 fn process_journal_entry(
     entry: &HashMap<String, String>,
     sender: &Sender<StorageEvent>,
-    buildin_regex_confs: &Vec<RegexConf>,
-    user_regex_confs: &Vec<RegexConf>,
+    buildin_regex_confs: &[RegexConf],
+    user_regex_confs: &[RegexConf],
 ) {
     let msg = match entry.get("MESSAGE") {
         Some(m) => {
-            if m.len() == 0 {
+            if m.is_empty() {
                 return;
             }
             m
@@ -87,7 +87,7 @@ fn process_journal_entry(
             if let Some(m) = cap.name("kdev") {
                 event.kdev = m.as_str().to_string();
             }
-            if event.kdev.len() == 0 {
+            if event.kdev.is_empty() {
                 continue;
             }
 
@@ -95,7 +95,7 @@ fn process_journal_entry(
                 event.sub_system = regex_conf.sub_system;
             }
 
-            if regex_conf.event_type.len() != 0 {
+            if !regex_conf.event_type.is_empty() {
                 event.event_type = regex_conf.event_type.to_string();
             }
 
@@ -117,7 +117,7 @@ fn process_journal_entry(
         }
     }
 
-    if event.sub_system == StorageSubSystem::Unknown || event.kdev.len() == 0 {
+    if event.sub_system == StorageSubSystem::Unknown || event.kdev.is_empty() {
         return;
     }
 

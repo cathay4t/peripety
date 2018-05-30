@@ -98,7 +98,7 @@ fn arg_match_to_cliopt(matches: &ArgMatches) -> CliOpt {
             {
                 Ok(t) => {
                     let timestamp = (t.timestamp() as u64) * 10u64.pow(6)
-                        + t.timestamp_subsec_micros() as u64;
+                        + u64::from(t.timestamp_subsec_micros());
                     ret.since = Some(timestamp);
                 }
                 Err(e) => {
@@ -125,7 +125,7 @@ fn arg_match_to_cliopt(matches: &ArgMatches) -> CliOpt {
             None => quit_with_msg("Invalid blk option"),
         };
     }
-    return ret;
+    ret
 }
 
 
@@ -141,13 +141,13 @@ fn handle_event(event: &StorageEvent, cli_opt: &CliOpt) {
         }
     }
     if let Some(ref subs) = cli_opt.sub_systems {
-        if subs.len() != 0 && !subs.contains(&event.sub_system) {
+        if !subs.is_empty() && !subs.contains(&event.sub_system) {
             is_match = false;
         }
     }
 
     if let Some(ref ets) = cli_opt.event_types {
-        if ets.len() != 0 && !ets.contains(&event.event_type) {
+        if !ets.is_empty() && !ets.contains(&event.event_type) {
             is_match = false;
         }
     }
@@ -171,10 +171,7 @@ fn handle_event(event: &StorageEvent, cli_opt: &CliOpt) {
                 .expect("BUG: DateTime::parse_from_rfc3339()")
                 .with_timezone(&Local)
                 .to_rfc2822();
-            let mut msg = &event.raw_msg;
-            if event.msg.len() != 0 {
-                msg = &event.msg;
-            }
+            let msg = if !event.msg.is_empty() { &event.msg } else { &event.raw_msg };
             println!(
                 "{} {} {} {}",
                 ts, event.hostname, event.sub_system, msg
@@ -184,7 +181,7 @@ fn handle_event(event: &StorageEvent, cli_opt: &CliOpt) {
 }
 
 fn handle_monitor(cli_opt: &CliOpt) {
-    if let Some(_) = cli_opt.since {
+    if cli_opt.since.is_some() {
         quit_with_msg("`monitor` sub-command does not allow `--since` option");
     }
 
@@ -286,11 +283,11 @@ fn handle_info(blk: &str, is_json: bool) {
                 println!("owners_types : {:?}", types);
                 println!(
                     "uuid         : {}",
-                    i.uuid.unwrap_or("".to_string())
+                    i.uuid.unwrap_or_else(|| "".to_string())
                 );
                 println!(
                     "mount_point  : {}",
-                    i.mount_point.unwrap_or("".to_string())
+                    i.mount_point.unwrap_or_else(|| "".to_string())
                 );
             }
         }

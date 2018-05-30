@@ -5,16 +5,16 @@ extern crate regex;
 extern crate sdjournal;
 #[macro_use]
 extern crate serde_derive;
-extern crate toml;
 extern crate chrono;
+extern crate toml;
 
+mod buildin_regex;
 mod collector;
 mod conf;
 mod data;
 mod fs;
 mod mpath;
 mod scsi;
-mod buildin_regex;
 
 use chan_signal::Signal;
 use conf::ConfMain;
@@ -32,7 +32,7 @@ fn send_to_journald(event: &StorageEvent) {
         "PRIORITY".to_string(),
         format!("{}", event.severity as u8),
     ));
-    if event.msg.len() != 0 {
+    if !event.msg.is_empty() {
         logs.push(("MESSAGE".to_string(), event.msg.clone()));
     }
     logs.push(("DEV_WWID".to_string(), event.dev_wwid.clone()));
@@ -71,7 +71,7 @@ fn send_to_journald(event: &StorageEvent) {
 
 fn handle_events_from_parsers(
     recver: &Receiver<StorageEvent>,
-    parsers: &Vec<ParserInfo>,
+    parsers: &[ParserInfo],
     daemon_conf: Option<ConfMain>,
 ) {
     let mut skip_stdout = true;
@@ -102,15 +102,16 @@ fn handle_events_from_parsers(
 
         // Send to parser if parser require it.
         for parser in parsers {
-            let required = match parser
+            let required = if parser
                 .filter_event_type
                 .contains(&EventType::Synthetic)
             {
-                true => match parser.filter_event_subsys {
+                match parser.filter_event_subsys {
                     None => true,
                     Some(ref syss) => syss.contains(&event.sub_system),
-                },
-                false => false,
+                }
+            } else {
+                false
             };
             if required {
                 if let Err(e) = parser.sender.send(event.clone()) {
@@ -126,22 +127,23 @@ fn handle_events_from_parsers(
 
 fn collector_to_parsers(
     collector_recv: &Receiver<StorageEvent>,
-    parsers: &Vec<ParserInfo>,
+    parsers: &[ParserInfo],
 ) {
     loop {
         match collector_recv.recv() {
             Ok(event) => {
                 // Send to parser if parser require it.
                 for parser in parsers {
-                    let required = match parser
+                    let required = if parser
                         .filter_event_type
                         .contains(&EventType::Raw)
                     {
-                        true => match parser.filter_event_subsys {
+                        match parser.filter_event_subsys {
                             None => true,
                             Some(ref syss) => syss.contains(&event.sub_system),
-                        },
-                        false => false,
+                        }
+                    } else {
+                        false
                     };
                     if required {
                         if let Err(e) = parser.sender.send(event.clone()) {
@@ -223,7 +225,7 @@ fn main() {
     println!("Peripetyd: Ready!");
 
     loop {
-        if let None = conf_changed_signal.recv() {
+        if conf_changed_signal.recv().is_none() {
             println!("Failed to recv() from signal channel");
             continue;
         }

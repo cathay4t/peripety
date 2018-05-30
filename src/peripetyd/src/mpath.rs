@@ -136,7 +136,7 @@ fn get_iscsi_info(host_id: &str) -> HashMap<String, String> {
 fn get_fc_info(host_id: &str, scsi_id: &str) -> HashMap<String, String> {
     let mut ret = HashMap::new();
     // fc-hosts are using the same host id with scsi host.
-    if let Some(index) = scsi_id.rfind(":") {
+    if let Some(index) = scsi_id.rfind(':') {
         let target_id = &scsi_id[..index];
         let target_dir = format!("/sys/class/fc_transport/target{}", target_id);
         let host_dir = format!("/sys/class/fc_host/host{}", host_id);
@@ -264,13 +264,14 @@ fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {
             let mut event = event.clone();
             event.dev_path = format!("/dev/mapper/{}", name);
             event.dev_wwid = uuid;
-            let path_blk_name =  match BlkInfo::major_minor_to_blk_name(&event.kdev) {
-                Ok(b) => b,
-                Err(e) => {
-                    println!("mpath_parser: {}", e);
-                    return;
-                },
-            };
+            let path_blk_name =
+                match BlkInfo::major_minor_to_blk_name(&event.kdev) {
+                    Ok(b) => b,
+                    Err(e) => {
+                        println!("mpath_parser: {}", e);
+                        return;
+                    }
+                };
             event.msg = format!(
                 "{} mpath_wwid: {}, path_blk_name: {}",
                 event.raw_msg, event.dev_wwid, path_blk_name
@@ -296,7 +297,9 @@ fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {
                             for (key, value) in
                                 get_scsi_transport_info(&path_blk_name)
                             {
-                                event.msg.push_str(&format!(", {}={}", key, value));
+                                event
+                                    .msg
+                                    .push_str(&format!(", {}={}", key, value));
                                 event.extension.insert(key, value);
                             }
                         }
@@ -324,9 +327,6 @@ fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {
 
 pub fn parser_start(sender: Sender<StorageEvent>) -> ParserInfo {
     let (event_in_sender, event_in_recver) = mpsc::channel();
-    let name = "mpath".to_string();
-    let filter_event_type = vec![EventType::Raw];
-    let filter_event_subsys = vec![StorageSubSystem::Multipath];
 
     if let Err(e) = Builder::new()
         .name("mpath_parser".into())
@@ -347,8 +347,8 @@ pub fn parser_start(sender: Sender<StorageEvent>) -> ParserInfo {
     println!("mpath_parser: Ready");
     ParserInfo {
         sender: event_in_sender,
-        name: name,
-        filter_event_type: filter_event_type,
-        filter_event_subsys: Some(filter_event_subsys),
+        name: "mpath".to_string(),
+        filter_event_type: vec![EventType::Raw],
+        filter_event_subsys: Some(vec![StorageSubSystem::Multipath]),
     }
 }

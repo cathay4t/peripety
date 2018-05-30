@@ -44,8 +44,8 @@ impl ConfCollectorRegex {
         };
         Ok(RegexConf {
             starts_with: self.starts_with.clone(),
-            regex: regex,
-            sub_system: sub_system,
+            regex,
+            sub_system,
             event_type: self.event_type.clone(),
         })
     }

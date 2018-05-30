@@ -110,7 +110,7 @@ pub(crate) fn blk_info_get_dm(blk: &str) -> Result<BlkInfo, PeripetyError> {
                 }
             }
         }
-        if ret.owners_wwids.len() == 0 {
+        if ret.owners_wwids.is_empty() {
             return Err(PeripetyError::InternalBug(format!(
                 "dm::blk_info_get_dm() not supported blk {}",
                 blk
@@ -119,9 +119,9 @@ pub(crate) fn blk_info_get_dm(blk: &str) -> Result<BlkInfo, PeripetyError> {
         return Ok(ret);
     }
 
-    return Err(PeripetyError::InternalBug(format!(
+    Err(PeripetyError::InternalBug(format!(
         "dm::blk_info_get_dm() \
          not supported blk {} as path {} not exists",
         blk, sysfs_uuid
-    )));
+    )))
 }

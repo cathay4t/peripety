@@ -44,9 +44,6 @@ fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {
 
 pub fn parser_start(sender: Sender<StorageEvent>) -> ParserInfo {
     let (event_in_sender, event_in_recver) = mpsc::channel();
-    let name = "scsi".to_string();
-    let filter_event_type = vec![EventType::Raw];
-    let filter_event_subsys = vec![StorageSubSystem::Scsi];
 
     spawn(move || loop {
         match event_in_recver.recv() {
@@ -57,8 +54,8 @@ pub fn parser_start(sender: Sender<StorageEvent>) -> ParserInfo {
 
     ParserInfo {
         sender: event_in_sender,
-        name: name,
-        filter_event_type: filter_event_type,
-        filter_event_subsys: Some(filter_event_subsys),
+        name: "scsi".to_string(),
+        filter_event_type: vec![EventType::Raw],
+        filter_event_subsys: Some(vec![StorageSubSystem::Scsi]),
     }
 }

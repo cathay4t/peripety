@@ -13,6 +13,7 @@ use std::fmt;
 use std::os::raw::c_char;
 use std::slice;
 use std::u64;
+use std::ptr;
 
 use std::os::unix::io::{AsRawFd, RawFd};
 
@@ -20,7 +21,7 @@ use std::os::unix::io::{AsRawFd, RawFd};
 pub enum SdJournal {}
 
 enum SdJournalOpen {
-    LocalOnly = 1 << 0,
+    LocalOnly = 1,
 
     // The following are not being utilized at the moment, just here for
     // documentation
@@ -76,7 +77,7 @@ impl ClibraryError {
     pub fn new(error_msg: String, return_code: i32) -> ClibraryError {
         ClibraryError {
             message: error_msg,
-            return_code: return_code,
+            return_code,
             err_reason: error_string(-return_code),
         }
     }
@@ -196,7 +197,7 @@ impl Drop for Journal {
 
 impl Journal {
     pub fn new() -> Result<Journal, SdJournalError> {
-        let mut tmp_handle = 0 as *mut SdJournal;
+        let mut tmp_handle = ptr::null_mut();
 
         let rc = unsafe {
             sd_journal_open(
@@ -222,7 +223,7 @@ impl Journal {
         &mut self,
         key: &'static str,
     ) -> Result<String, SdJournalError> {
-        let mut x = 0 as *mut c_void;
+        let mut x = ptr::null_mut();
         let mut len = 0 as size_t;
         let field = CString::new(key)?;
 
@@ -238,16 +239,14 @@ impl Journal {
         if rc == 0 {
             let slice = unsafe { slice::from_raw_parts(x as *const u8, len) };
             log_msg = String::from_utf8(slice[key.len()..len].to_vec())?;
+        } else if rc == -ENOENT {
+            // TODO: Is there a better way to handle a key not being found?
+            log_msg = String::from("");
         } else {
-            if rc == -ENOENT {
-                // TODO: Is there a better way to handle a key not being found?
-                log_msg = String::from("");
-            } else {
-                return Err(SdJournalError::CError(ClibraryError::new(
-                    String::from("Error on sd_journal_get_data"),
-                    rc,
-                )));
-            }
+            return Err(SdJournalError::CError(ClibraryError::new(
+                String::from("Error on sd_journal_get_data"),
+                rc,
+            )));
         }
 
         Ok(log_msg)
@@ -262,7 +261,7 @@ impl Journal {
         unsafe { sd_journal_restart_data(self.handle) };
 
         loop {
-            let mut x = 0 as *mut c_void;
+            let mut x = ptr::null_mut();
             let mut len = 0 as size_t;
 
             let rc = unsafe {
@@ -315,7 +314,7 @@ impl Journal {
 
     pub fn get_events_bit_mask(&mut self) -> i16 {
         let x = unsafe { sd_journal_get_events(self.handle) };
-        return x as i16;
+        x as i16
     }
 
     pub fn seek_tail(&mut self) -> Result<(), SdJournalError> {

@@ -20,17 +20,12 @@ fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {
             };
             event.msg = format!(
                 "{}, uuid: '{}', blk_wwid: '{}', blk_path: '{}'",
-                event.raw_msg,
-                uuid,
-                blk_info.wwid,
-                blk_info.blk_path,
+                event.raw_msg, uuid, blk_info.wwid, blk_info.blk_path,
             );
 
             if let Some(mnt_pnt) = blk_info.mount_point {
-                event.msg = format!(
-                    "{}, mount_point: '{}'",
-                    event.msg, mnt_pnt
-                );
+                event.msg =
+                    format!("{}, mount_point: '{}'", event.msg, mnt_pnt);
                 event
                     .extension
                     .insert("mount_point".to_string(), mnt_pnt.clone());
@@ -71,8 +66,8 @@ pub fn parser_start(sender: Sender<StorageEvent>) -> ParserInfo {
 
     ParserInfo {
         sender: event_in_sender,
-        name: name,
-        filter_event_type: filter_event_type,
+        name,
+        filter_event_type,
         filter_event_subsys: Some(filter_event_subsys),
     }
 }

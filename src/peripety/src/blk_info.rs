@@ -57,7 +57,7 @@ impl BlkInfo {
     }
 
     pub fn new_skip_extra(blk: &str) -> Result<BlkInfo, PeripetyError> {
-        return BlkInfo::_new(blk, true);
+        BlkInfo::_new(blk, true)
     }
 
     fn _new(
@@ -65,7 +65,7 @@ impl BlkInfo {
         skip_holder_check: bool,
     ) -> Result<BlkInfo, PeripetyError> {
         // device symbolic link or full path.
-        if blk.starts_with("/") {
+        if blk.starts_with('/') {
             if Path::new(blk).exists() {
                 if let Ok(p) = Path::new(blk).canonicalize() {
                     if let Some(s) = p.file_name() {
@@ -199,10 +199,10 @@ impl BlkInfo {
                 }
             }
         }
-        return Err(PeripetyError::BlockNoExists(format!(
+        Err(PeripetyError::BlockNoExists(format!(
             "No block device is not holding any uuid {}",
             blk_path
-        )));
+        )))
     }
 
     pub fn to_json_string(&self) -> Result<String, PeripetyError> {
@@ -260,10 +260,10 @@ impl BlkInfo {
             }
         }
         unsafe { libc::endmntent(fd) };
-        if ret.len() == 0 {
+        if ret.is_empty() {
             return None;
         }
-        return Some(ret);
+        Some(ret)
     }
 
     pub fn major_minor_to_blk_name(
