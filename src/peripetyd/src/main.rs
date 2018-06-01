@@ -230,6 +230,7 @@ fn main() {
             continue;
         }
         if let Some(c) = conf::load_conf() {
+            println!("Config reloaded");
             if let Err(e) = conf_send.send(c.collector) {
                 println!("Failed to send config to collector: {}", e);
                 continue;

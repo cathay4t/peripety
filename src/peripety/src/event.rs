@@ -65,6 +65,7 @@ impl FromStr for StorageSubSystem {
             "EXT4" => Ok(StorageSubSystem::FsExt4),
             "XFS" => Ok(StorageSubSystem::FsXfs),
             "NVME" => Ok(StorageSubSystem::Nvme),
+            "JBD2" => Ok(StorageSubSystem::FsJbd2),
             _ => Err(PeripetyError::StorageSubSystemParseError(
                 format!("Invalid StorageSubSystem string {}", s),
             )),

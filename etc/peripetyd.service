@@ -1,0 +1,11 @@
+[Unit]
+Description=Peripety storage event daemon
+
+[Service]
+ExecStart=/usr/bin/peripetyd
+ExecReload=/bin/kill -HUP $MAINPID
+StandardError=syslog
+User=root
+
+[Install]
+WantedBy=multi-user.target

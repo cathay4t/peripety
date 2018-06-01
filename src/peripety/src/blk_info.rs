@@ -38,6 +38,7 @@ pub struct BlkInfo {
     pub wwid: String,
     pub blk_type: BlkType,
     pub blk_path: String,
+    pub preferred_blk_path: String, // preferred block path
     pub owners_wwids: Vec<String>,
     pub owners_types: Vec<BlkType>,
     pub owners_paths: Vec<String>,
@@ -48,9 +49,13 @@ pub struct BlkInfo {
 impl BlkInfo {
     pub fn new(blk: &str) -> Result<BlkInfo, PeripetyError> {
         let mut bi = BlkInfo::_new(blk, false)?;
-        if let Ok(uuid) = BlkInfo::uuid(&bi.blk_path) {
-            // Only search mount table when block has uuid.
-            bi.uuid = Some(uuid);
+        if bi.uuid.is_none() {
+            if let Ok(uuid) = BlkInfo::uuid(&bi.blk_path) {
+                // Only search mount table when block has uuid.
+                bi.uuid = Some(uuid);
+            }
+        }
+        if bi.uuid.is_some() {
             bi.mount_point = BlkInfo::get_mount_point(&bi.blk_path);
         }
         Ok(bi)

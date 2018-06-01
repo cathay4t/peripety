@@ -1,3 +1,4 @@
+ * Find a way to live in initramfs.
  * User case trigger file system event on block predict error.
  * Move `prpt` funtions to API.
  * Support of NVMe logs.
@@ -7,4 +8,4 @@
  * Add license lines to all code files.
  * Support multipathd user space logs.
  * Support better daemon logging -- info/debug/warnning/error.
- * Log udev add/change/del action of block.
+ * Log SID device ready/delete action.

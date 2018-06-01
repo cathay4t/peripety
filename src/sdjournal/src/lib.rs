@@ -11,9 +11,9 @@ use std::ffi::CStr;
 use std::ffi::CString;
 use std::fmt;
 use std::os::raw::c_char;
+use std::ptr;
 use std::slice;
 use std::u64;
-use std::ptr;
 
 use std::os::unix::io::{AsRawFd, RawFd};
 

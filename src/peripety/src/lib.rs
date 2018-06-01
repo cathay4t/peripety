@@ -29,17 +29,17 @@
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
-extern crate serde_json;
-extern crate regex;
 extern crate libc;
+extern crate regex;
+extern crate serde_json;
 
+pub use self::blk_info::{BlkInfo, BlkType};
 pub use self::error::PeripetyError;
-pub use self::event::{LogSeverity, StorageSubSystem, StorageEvent};
-pub use self::blk_info::{BlkType, BlkInfo};
+pub use self::event::{LogSeverity, StorageEvent, StorageSubSystem};
 
-mod error;
-mod event;
 mod blk_info;
 mod dm;
+mod error;
+mod event;
 mod scsi;
 mod sysfs;

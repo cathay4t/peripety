@@ -33,7 +33,7 @@ extern crate nix;
 extern crate peripety;
 extern crate sdjournal;
 
-use chrono::{DateTime, Local, TimeZone, Datelike, Duration};
+use chrono::{DateTime, Datelike, Duration, Local, TimeZone};
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use nix::sys::select::FdSet;
 use peripety::{BlkInfo, LogSeverity, StorageEvent, StorageSubSystem};
@@ -160,14 +160,11 @@ fn arg_match_to_cliopt(matches: &ArgMatches) -> CliOpt {
     }
     if matches.is_present("since") {
         match matches.value_of("since") {
-            Some(s) => match since_cliopt_to_journald_timestamp(s)
-            {
+            Some(s) => match since_cliopt_to_journald_timestamp(s) {
                 Some(t) => {
                     ret.since = Some(t);
                 }
-                None => {
-                    quit_with_msg(&format!("Invalid --since option"))
-                }
+                None => quit_with_msg(&format!("Invalid --since option")),
             },
             None => quit_with_msg("Invalid since"),
         }
@@ -338,22 +335,23 @@ fn handle_info(blk: &str, is_json: bool) {
                         .expect("BUG: handle_info()")
                 );
             } else {
-                println!("blk_path     : {}", i.blk_path);
-                println!("blk_type     : {}", i.blk_type);
-                println!("wwid         : {}", i.wwid);
-                println!("owners_wwids : {:?}", i.owners_wwids);
-                println!("owners_paths : {:?}", i.owners_paths);
+                println!("blk_path           : {}", i.blk_path);
+                println!("preferred_blk_path : {}", i.preferred_blk_path);
+                println!("blk_type           : {}", i.blk_type);
+                println!("wwid               : {}", i.wwid);
+                println!("owners_wwids       : {:?}", i.owners_wwids);
+                println!("owners_paths       : {:?}", i.owners_paths);
                 let mut types = Vec::new();
                 for t in i.owners_types {
                     types.push(format!("{}", t));
                 }
-                println!("owners_types : {:?}", types);
+                println!("owners_types       : {:?}", types);
                 println!(
-                    "uuid         : {}",
+                    "uuid               : {}",
                     i.uuid.unwrap_or_else(|| "".to_string())
                 );
                 println!(
-                    "mount_point  : {}",
+                    "mount_point        : {}",
                     i.mount_point.unwrap_or_else(|| "".to_string())
                 );
             }

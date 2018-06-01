@@ -3,10 +3,7 @@
 * [Storage Event Notification Daemon](#storage-event-notification-daemon)
     * [Features](#features)
     * [How-to](#how-to)
-    * [Event example](#event-example)
-    * [Thread types](#thread-types)
-    * [Workflow](#workflow)
-    * [Daemon Configuration.](#daemon-configuration)
+    * [Event examples](#event-examples)
     * [FAQ](#faq)
         * [What can be done by kernel](#what-can-be-done-by-kernel)
         * [Why another daemon?](#why-another-daemon)
@@ -17,47 +14,74 @@
 
 # Storage Event Notification Daemon
 
+Peripety is designed to parse system storage logging into structured storage
+event helping user investigate storage issues.
+
+To do so, it provides three tools:
+    * Daemon -- `peripetyd`
+
+      The daemon parses incoming storage logs and saved the structured
+      peripety storage event for future query or event notification.
+
+      The daemon has build-in regular expressions for parsing system logs. If
+      that does not works on your system. You may define your own regexs in
+      `/etc/peripetyd.conf`. Please refer to [sample config][4] which
+      contains detail documentation.
+
+    * CLI -- `prpt`
+
+      Command line tool of peripety for event query, event monitor, block
+      information query. Please check manpage of prpr for detail documents.
+
+    * Rust binding -- `peripety`
+
+      Developer friendly interface for query, monitor peripety storage events.
+      Please check crate document for detail. TODO: Add docs.rs link.
+
 ## Features
 
  * Provides device consistent id, event type and extra information like
    FC/iSCSI path detail and FS mount point.
 
- * CLI tool `prpt` to query and monitor events.
+ * CLI tool `prpt` to query, monitor events and query block information.
 
- * Use sysfs and devfs for information query only. Designed to handle
-   log burst.
+ * Non-invasive/non-IO generating for event processing.
 
  * Events are stored in journald with structured data(JSON).
 
- * Allows user defined regex in /etc/peripetyd.conf.
+ * Allows user defined regex in `/etc/peripetyd.conf`.
 
- * TBD: C/python/rust lightweight library for query block information
-   on all kind of dev string(major:minor, scsi_id, nvme ctrl_id+ns_id,
-   etc).
+ * Rust crate `peripety` for query block information on all kind of dev
+   string(major:minor, scsi_id, nvme ctrl_id+ns_id, etc).
 
- * TODO: Varlink(json) interface.
+ * TODO: Varlink(JSON) interface.
 
  * TODO: Handle user space tool logs like mulitpathd, iscsid.
 
-
 ## How-to
 
- * Start Daemon
+ * Install
 
 ```bash
 # Please install systemd-devel package.
 make
-make run
+sudo make install
+```
+
+ * Start Daemon
+
+```bash
+sudo systemctl start peripetyd
 ```
 
  * Start monitor CLI
 
 ```bash
 # You may remove the `sudo` if in `systemd-journal` group.
-sudo ./target/debug/prpt monitor -J
+sudo prpt monitor -J
 ```
 
- * Trigger some events
+ * Trigger some test events
 
 ```
 # SCSI sector hardware error
@@ -76,75 +100,14 @@ sudo ./target/debug/prpt monitor -J
 
 ```bash
 # You may remove the `sudo` if in `systemd-journal` group.
-sudo ./target/debug/prpt query
+sudo prpt query
 ```
 
-## Event example
+## Event examples
 
 * [Ext4 mounted on LVM LV over SCSI multipath][2]
 
 * [FC Multipath got path failure][3]
-
-## Thread types
-* **Collector**
-
-  Collects raw events from journald.
-  For a raw event, `dev_wwid` might be missing and `dev_name` might not
-  be human friendly (for example, a SCSI disk event might have `dev_name`
-  "4:0:0:1").
-  TODO: Allows use to extend regex used for parsing journals.
-
-* **Parser**
-
-  Parses both raw and synthetic events then generates synthetic events for
-  collectors.
-  For the generated synthetic events the parser must provide a valid and
-  consistent `dev_wwid` and human-friendly `dev_name` value.
-  Restricts the events it parses to an appropriate subset using a filter.
-
-  Examples: `mpath`, `scsi`, `fs`, and `dm` thread.
-
-* **Notifier**
-
-  Listens to all events, and generates appropriate actions.
-
-  Examples: `stdout`, `journald`, `email`, `irc`, etc.
-
-## Workflow
-
-![work flow](./peripety_design.png)
-
-0. The daemon starts all threads.
-1. The `collector` thread collects an event from journald.
-2. The `collector` thread parse the event and sends the raw event to the daemon.
-3. The daemon sends the event to selected parser threads based on their filter
-   settings.
-4. The selected parser plugins process the event and each sends a synthetic
-   event back to the daemon.
-5. The daemon broadcasts all synthetic events to notifier threads.
-
-## Daemon Configuration.
-
-The configuration file will be `/etc/peripetyd.conf`, example:
-
-```toml
-[main]
-notify_stdout = true
-save_to_journald = true
-
-[[collector_regexs]]
-# This regex is already build-in.
-starts_with = "device-mapper: multipath:"
-regex = '''(?x)
-        ^device-mapper:\s
-        multipath:\ Failing\ path\s
-        (?P<kdev>\d+:\d+).$
-'''
-# `kdev` naming capture group is mandatory.
-# `sub_system` naming capture group is optional.
-sub_system = "multipath"
-event_type = "DM_MPATH_PATH_FAILED"
-```
 
 ## FAQ
 
@@ -176,3 +139,4 @@ I have created [some patches][1] hoping kernel could provides in logs:
 [1]: https://github.com/cathay4t/linux/commits/structured_log
 [2]: https://github.com/cathay4t/peripety/blob/master/examples/fs/ext4_mount_lv_mpath_scsi.json
 [3]: https://github.com/cathay4t/peripety/blob/master/examples/mpath/mpath_fc_path_offline.json
+[4]: https://github.com/cathay4t/peripety/blob/master/etc/peripetyd.conf

@@ -37,6 +37,43 @@ The block string could be any of following forms:
  * UUID. E.g. "7ef54c0b-b81c-4d4b-8ed4-5297ec54fadd".
  * WWID used by peripety events.
 
+The returned block information will contains:
+
+ * \fBpreferred_blk_path\fR
+   The preferred block path which will be consistent after reboot.
+   E.g. When query on a path of multipath `mpatha`, the `blk_path` will be set
+   to `/dev/mapper/mpatha` instead of `/dev/sda` or `/dev/dm-0`.
+
+ * \fBblk_path\fR
+   The block path commonly known by kernel. Might be change after reboot.
+
+ * \fBwwid\fR
+   The unified ID for the block device.
+
+ * \fBblk_type\fR
+   The type of block device. Possible values are:
+   '\fBSCSI\fR', '\fBDevice Mapper\fR', '\fBDevice Mapper Multipath\fR',
+   '\fBDevice Mapper LVM\fR', '\fBPartition\fR'
+
+ * \fBowners_wwids\fR
+   If specified block device is from other device, this field will contains
+   unified ID of all its dependency blocks.
+
+ * \fBowners_types\fR
+   If specified block device is from other device, this field will contains
+   block type of all its dependency blocks.
+
+ * \fBowners_paths\fR
+   If specified block device is from other device, this field will contains
+   block path of all its dependency blocks.
+
+ * \fBuuid\fR
+   The UUID of file system if avaiable.
+
+ * \fBmount_point\fR
+   The mount pointe of file system if avaiable.
+
+
 Example:
 
 .nf

@@ -33,6 +33,7 @@ pub(crate) fn blk_info_get_dm(blk: &str) -> Result<BlkInfo, PeripetyError> {
         let mut ret = BlkInfo {
             wwid: Sysfs::read(&sysfs_uuid)?,
             blk_type: BlkType::Dm,
+            preferred_blk_path: format!("/dev/mapper/{}", &name),
             blk_path: format!("/dev/mapper/{}", &name),
             owners_wwids: Vec::new(),
             owners_types: Vec::new(),
@@ -44,6 +45,8 @@ pub(crate) fn blk_info_get_dm(blk: &str) -> Result<BlkInfo, PeripetyError> {
             ret.blk_type = BlkType::DmLvm;
         } else if ret.wwid.starts_with("mpath-") {
             ret.blk_type = BlkType::DmMultipath;
+        } else if ret.wwid.starts_with("part") {
+            ret.blk_type = BlkType::Partition;
         }
         let slave_dir = format!("/sys/block/{}/slaves", &blk);
         let entries = match fs::read_dir(&slave_dir) {

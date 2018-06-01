@@ -70,17 +70,47 @@ pub(crate) fn blk_info_get_scsi(blk: &str) -> Result<BlkInfo, PeripetyError> {
                 .expect("BUG: blk_info_get_scsi()")
                 // ^ We never panic as above regex is valid.
                 .as_str();
-            let blk_info = blk_info_get_scsi(&name)?;
-            return Ok(BlkInfo {
+            let blk_info = BlkInfo::new(&name)?;
+            let mut blk_path = format!("/dev/{}", &blk);
+            let uuid = match BlkInfo::uuid(&blk_path) {
+                Ok(u) => Some(u),
+                Err(_) => None,
+            };
+            // udev create mpatha-part1 while kpartx create mpatha1
+            if blk_info.blk_type == BlkType::DmMultipath {
+                blk_path = format!("{}-part{}", blk_info.blk_path, part);
+                if !Path::new(&blk_path).exists() {
+                    blk_path = format!("{}{}", blk_info.blk_path, part);
+                    if !Path::new(&blk_path).exists() {
+                        return Err(PeripetyError::BlockNoExists(format!(
+                            "Multipath partition file of {} partition {} \
+                             is missing, please use kpartx to create them",
+                            blk_info.blk_path, part
+                        )));
+                    }
+                }
+            }
+
+            let preferred_blk_path = if let Some(u) = &uuid {
+                format!("/dev/disk/by-uuid/{}", u)
+            } else {
+                get_prefered_blk_path(&blk_path)
+            };
+            let mut ret = BlkInfo {
                 wwid: format!("{}-part{}", blk_info.wwid, part),
                 blk_type: BlkType::Partition,
-                blk_path: format!("/dev/{}", &blk),
-                owners_wwids: vec![blk_info.wwid],
-                owners_types: vec![BlkType::Scsi],
-                owners_paths: vec![blk_info.blk_path],
-                uuid: None,
+                blk_path,
+                preferred_blk_path,
+                uuid,
+                owners_wwids: blk_info.owners_wwids,
+                owners_types: blk_info.owners_types,
+                owners_paths: blk_info.owners_paths,
                 mount_point: None,
-            });
+            };
+            ret.owners_wwids.insert(0, blk_info.wwid);
+            ret.owners_types.insert(0, blk_info.blk_type);
+            ret.owners_paths.insert(0, blk_info.blk_path);
+            return Ok(ret);
         }
     }
 
@@ -95,10 +125,12 @@ pub(crate) fn blk_info_get_scsi(blk: &str) -> Result<BlkInfo, PeripetyError> {
     }
 
     if Path::new(&sysfs_path).exists() {
+        let blk_path = format!("/dev/{}", &name);
         return Ok(BlkInfo {
             wwid: pretty_wwid(&Sysfs::read(&sysfs_path)?),
             blk_type: BlkType::Scsi,
-            blk_path: format!("/dev/{}", &name),
+            preferred_blk_path: get_prefered_blk_path(&blk_path),
+            blk_path,
             owners_wwids: Vec::new(),
             owners_types: Vec::new(),
             owners_paths: Vec::new(),
@@ -111,4 +143,35 @@ pub(crate) fn blk_info_get_scsi(blk: &str) -> Result<BlkInfo, PeripetyError> {
         "scsi::blk_info_get_scsi(): Got invalid scsi blk {}",
         blk
     )))
+}
+
+fn get_prefered_blk_path(raw_blk_path: &str) -> String {
+    let dev_folder = "/dev/disk/by-id";
+    let raw_path = Path::new(raw_blk_path);
+    let mut matches = Vec::new();
+    if let Ok(entries) = fs::read_dir(dev_folder) {
+        for entry in entries {
+            let e = match entry {
+                Ok(e) => e,
+                Err(_) => continue,
+            };
+            if let Some(s) = e.file_name().to_str() {
+                if let Ok(p) = Path::new(dev_folder).join(s).canonicalize() {
+                    if p == raw_path {
+                        matches.push(s.to_string())
+                    }
+                }
+            }
+        }
+    }
+    for s in &matches {
+        if s.starts_with("wwn-") {
+            return format!("{}/{}", dev_folder, s);
+        }
+    }
+
+    match matches.get(0) {
+        Some(s) => format!("{}/{}", dev_folder, s),
+        None => raw_blk_path.to_string(),
+    }
 }

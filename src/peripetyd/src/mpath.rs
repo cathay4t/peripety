@@ -344,7 +344,6 @@ pub fn parser_start(sender: Sender<StorageEvent>) -> ParserInfo {
         );
     }
 
-    println!("mpath_parser: Ready");
     ParserInfo {
         sender: event_in_sender,
         name: "mpath".to_string(),
