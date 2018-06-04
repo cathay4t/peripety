@@ -18,25 +18,25 @@ Peripety is designed to parse system storage logging into structured storage
 event helping user investigate storage issues.
 
 To do so, it provides three tools:
-    * Daemon -- `peripetyd`
+ * Daemon -- `peripetyd`
 
-      The daemon parses incoming storage logs and saved the structured
-      peripety storage event for future query or event notification.
+   The daemon parses incoming storage logs and saved the structured
+   peripety storage event for future query or event notification.
 
-      The daemon has build-in regular expressions for parsing system logs. If
-      that does not works on your system. You may define your own regexs in
-      `/etc/peripetyd.conf`. Please refer to [sample config][4] which
-      contains detail documentation.
+   The daemon has build-in regular expressions for parsing system logs. If
+   that does not works on your system. You may define your own regexs in
+   `/etc/peripetyd.conf`. Please refer to [sample config][4] which
+   contains detail documentation.
 
-    * CLI -- `prpt`
+ * CLI -- `prpt`
 
-      Command line tool of peripety for event query, event monitor, block
-      information query. Please check manpage of prpr for detail documents.
+   Command line tool of peripety for event query, event monitor, block
+   information query. Please check manpage of prpr for detail documents.
 
-    * Rust binding -- `peripety`
+ * Rust binding -- `peripety`
 
-      Developer friendly interface for query, monitor peripety storage events.
-      Please check crate document for detail. TODO: Add docs.rs link.
+   Developer friendly interface for query, monitor peripety storage events.
+   Please check crate document for detail. TODO: Add docs.rs link.
 
 ## Features
 
