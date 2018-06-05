@@ -1,4 +1,3 @@
-extern crate chan_signal;
 extern crate nix;
 extern crate peripety;
 extern crate regex;
@@ -6,6 +5,7 @@ extern crate sdjournal;
 #[macro_use]
 extern crate serde_derive;
 extern crate chrono;
+extern crate libc;
 extern crate toml;
 
 mod buildin_regex;
@@ -16,10 +16,12 @@ mod fs;
 mod mpath;
 mod scsi;
 
-use chan_signal::Signal;
 use conf::ConfMain;
 use data::{EventType, ParserInfo};
 use peripety::StorageEvent;
+use std::mem;
+use std::process::exit;
+use std::ptr;
 use std::sync::mpsc;
 use std::sync::mpsc::Receiver;
 use std::thread::{sleep, Builder};
@@ -176,7 +178,21 @@ fn main() {
         collector_conf = Some(c.collector);
     }
 
-    let conf_changed_signal = chan_signal::notify(&[Signal::HUP]);
+    let sig_fd = unsafe {
+        let mut mask: libc::sigset_t = mem::uninitialized();
+        libc::sigemptyset(&mut mask);
+        libc::sigaddset(&mut mask, libc::SIGHUP);
+        libc::sigprocmask(libc::SIG_BLOCK, &mask, ptr::null_mut());
+        libc::signalfd(
+            -1, /* create new fd */
+            &mut mask,
+            0, /* no flag */
+        )
+    };
+    if sig_fd < 0 {
+        println!("BUG: Failed to handle SIGHUP signal");
+        exit(1);
+    }
 
     // 1. Start parser threads
     parsers.push(mpath::parser_start(notifier_send.clone()));
@@ -224,11 +240,35 @@ fn main() {
 
     println!("Peripetyd: Ready!");
 
+    let mut sig: libc::signalfd_siginfo = unsafe { mem::uninitialized() };
+    let sig_size = std::mem::size_of::<libc::signalfd_siginfo>();
+
     loop {
-        if conf_changed_signal.recv().is_none() {
-            println!("Failed to recv() from signal channel");
+        let mut fds = nix::sys::select::FdSet::new();
+        fds.insert(sig_fd);
+        if let Err(e) =
+            nix::sys::select::select(None, Some(&mut fds), None, None, None)
+        {
+            println!(
+                "collector: Failed select against signal fd: {}",
+                e
+            );
             continue;
         }
+        if fds.contains(sig_fd) {
+            unsafe {
+                if libc::read(
+                    sig_fd,
+                    &mut sig as *mut _ as *mut libc::c_void,
+                    sig_size,
+                ) != sig_size as isize
+                    || sig.ssi_signo != libc::SIGHUP as u32
+                {
+                    continue;
+                }
+            }
+        }
+
         if let Some(c) = conf::load_conf() {
             println!("Config reloaded");
             if let Err(e) = conf_send.send(c.collector) {
