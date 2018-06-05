@@ -91,7 +91,7 @@ pub(crate) fn blk_info_get_scsi(blk: &str) -> Result<BlkInfo, PeripetyError> {
                 }
             }
 
-            let preferred_blk_path = if let Some(u) = &uuid {
+            let preferred_blk_path = if let Some(ref u) = uuid {
                 format!("/dev/disk/by-uuid/{}", u)
             } else {
                 get_prefered_blk_path(&blk_path)
