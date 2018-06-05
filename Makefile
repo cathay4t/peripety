@@ -34,4 +34,5 @@ install: target/release/peripetyd target/release/prpt
 	$(INSTALL) -m 644 doc/prpt.1 $(DESTDIR)$(mandir)/man1/
 	$(INSTALL) -d $(DESTDIR)$(etcdir)
 	$(INSTALL) -m 644 etc/peripetyd.conf $(DESTDIR)$(etcdir)/
+	$(INSTALL) -d $(DESTDIR)$(systemdunitdir)
 	$(INSTALL) -m 644 etc/peripetyd.service $(DESTDIR)$(systemdunitdir)/
