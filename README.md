@@ -131,8 +131,8 @@ I have created [some patches][1] hoping kernel could provides in logs:
 
 #### Why this tool is better?
 
- * Rust is memory-leak-proof and quite easy to handle threading, IPC and string
-   manipulation.
+ * Rust is almost-memory-leak-proof and quite easy to handle threading, IPC and
+   string manipulation.
 
  * Only do one thing quick and simple -- provide storage events.
 
