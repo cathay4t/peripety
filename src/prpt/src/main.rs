@@ -29,6 +29,7 @@
 extern crate chrono;
 #[macro_use]
 extern crate clap;
+extern crate libc;
 extern crate nix;
 extern crate peripety;
 extern crate sdjournal;
@@ -37,8 +38,24 @@ use chrono::{DateTime, Datelike, Duration, Local, TimeZone};
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
 use nix::sys::select::FdSet;
 use peripety::{BlkInfo, LogSeverity, StorageEvent, StorageSubSystem};
+use std::ffi::CStr;
+use std::io::{self, Write};
 use std::os::unix::io::AsRawFd;
 use std::process::exit;
+
+macro_rules! to_stdout {
+    ($($arg:tt)*) => (
+        if let Err(_) = writeln!(&mut io::stdout(), $($arg)*) {
+            exit(0);
+        });
+}
+
+macro_rules! to_stderr {
+    ($($arg:tt)*) => (
+        if let Err(_) = writeln!(&mut io::stderr(), $($arg)*) {
+            exit(0);
+        });
+}
 
 #[derive(Debug, Clone)]
 struct CliOpt {
@@ -65,7 +82,7 @@ arg_enum!{
 }
 
 fn quit_with_msg(msg: &str) {
-    println!("Error: {}", msg);
+    to_stderr!("Error: {}", msg);
     exit(1);
 }
 
@@ -220,7 +237,7 @@ fn handle_event(event: &StorageEvent, cli_opt: &CliOpt) {
 
     if is_match {
         if cli_opt.is_json {
-            println!(
+            to_stdout!(
                 "{}\n",
                 event
                     .to_json_string_pretty()
@@ -236,12 +253,16 @@ fn handle_event(event: &StorageEvent, cli_opt: &CliOpt) {
             } else {
                 &event.raw_msg
             };
-            println!(
+            to_stdout!(
                 "{} {} {} {}",
-                ts, event.hostname, event.sub_system, msg
-            )
+                ts,
+                event.hostname,
+                event.sub_system,
+                msg
+            );
         }
     }
+    ()
 }
 
 fn handle_monitor(cli_opt: &CliOpt) {
@@ -267,11 +288,10 @@ fn handle_monitor(cli_opt: &CliOpt) {
         if let Err(e) =
             nix::sys::select::select(None, Some(&mut fds), None, None, None)
         {
-            println!(
+            quit_with_msg(&format!(
                 "collector: Failed select against journal fd: {}",
                 e
-            );
-            continue;
+            ));
         }
         if !fds.contains(journal.as_raw_fd()) {
             continue;
@@ -285,9 +305,10 @@ fn handle_monitor(cli_opt: &CliOpt) {
                         }
                     }
                 }
-                Err(e) => {
-                    println!("Error retrieving the journal entry: {:?}", e)
-                }
+                Err(e) => quit_with_msg(&format!(
+                    "Failed to retrieve the journal entry: {:?}",
+                    e
+                )),
             }
         }
     }
@@ -316,41 +337,45 @@ fn handle_query(cli_opt: &CliOpt) {
                 if let Some(j) = entry.get("JSON") {
                     match StorageEvent::from_json_string(j) {
                         Ok(event) => handle_event(&event, &cli_opt),
-                        Err(e) => println!("Error: {}", e),
+                        Err(e) => quit_with_msg(&format!("Error: {}", e)),
                     };
                 }
             }
-            Err(e) => println!("Error retrieving the journal entry: {:?}", e),
+            Err(e) => quit_with_msg(&format!(
+                "Error retrieving the journal entry: {:?}",
+                e
+            )),
         }
     }
 }
 
+#[allow(unused_must_use)]
 fn handle_info(blk: &str, is_json: bool) {
     match BlkInfo::new(blk) {
         Ok(i) => {
             if is_json {
-                println!(
+                to_stdout!(
                     "{}",
                     i.to_json_string_pretty()
                         .expect("BUG: handle_info()")
                 );
             } else {
-                println!("blk_path           : {}", i.blk_path);
-                println!("preferred_blk_path : {}", i.preferred_blk_path);
-                println!("blk_type           : {}", i.blk_type);
-                println!("wwid               : {}", i.wwid);
-                println!("owners_wwids       : {:?}", i.owners_wwids);
-                println!("owners_paths       : {:?}", i.owners_paths);
+                to_stdout!("blk_path           : {}", i.blk_path);
+                to_stdout!("preferred_blk_path : {}", i.preferred_blk_path);
+                to_stdout!("blk_type           : {}", i.blk_type);
+                to_stdout!("wwid               : {}", i.wwid);
+                to_stdout!("owners_wwids       : {:?}", i.owners_wwids);
+                to_stdout!("owners_paths       : {:?}", i.owners_paths);
                 let mut types = Vec::new();
                 for t in i.owners_types {
                     types.push(format!("{}", t));
                 }
-                println!("owners_types       : {:?}", types);
-                println!(
+                to_stdout!("owners_types       : {:?}", types);
+                to_stdout!(
                     "uuid               : {}",
                     i.uuid.unwrap_or_else(|| "".to_string())
                 );
-                println!(
+                to_stdout!(
                     "mount_point        : {}",
                     i.mount_point.unwrap_or_else(|| "".to_string())
                 );
@@ -358,6 +383,31 @@ fn handle_info(blk: &str, is_json: bool) {
         }
         Err(e) => quit_with_msg(&format!("{}", e)),
     };
+}
+
+fn check_permission() {
+    let journal_group_name = "systemd-journal";
+    if nix::unistd::geteuid() == nix::unistd::Uid::from_raw(0) {
+        return;
+    }
+
+    // The getgrgid is not thread safe, since we are not using any thread in
+    // ptpr, we should be OK.
+    for gid in nix::unistd::getgroups().unwrap() {
+        unsafe {
+            let gp: libc::group = *libc::getgrgid(From::from(gid));
+            if journal_group_name
+                == CStr::from_ptr(gp.gr_name).to_str().unwrap()
+            {
+                return;
+            }
+        }
+    }
+    quit_with_msg(&format!(
+        "Permission check failed: Not root, not in \
+         '{}' group. Use '-f' to skip this check.",
+        journal_group_name
+    ));
 }
 
 fn main() {
@@ -382,6 +432,8 @@ fn main() {
 
     let json_arg = Arg::from_usage("-J 'Use json format'");
 
+    let no_permission_arg = Arg::from_usage("-f 'Skip permission check'");
+
     let matches = App::new("Peripety CLI")
         .version("0.1")
         .author("Gris Ge <fge@redhat.com>")
@@ -390,6 +442,7 @@ fn main() {
         .subcommand(
             SubCommand::with_name("monitor")
                 .about("Monitor following up events")
+                .arg(&no_permission_arg)
                 .arg(&json_arg)
                 .arg(&sev_arg)
                 .arg(&evt_arg)
@@ -399,6 +452,7 @@ fn main() {
         .subcommand(
             SubCommand::with_name("query")
                 .about("Query saved events")
+                .arg(&no_permission_arg)
                 .arg(&json_arg)
                 .arg(&sev_arg)
                 .arg(&evt_arg)
@@ -424,12 +478,18 @@ fn main() {
         .get_matches();
 
     if let Some(matches) = matches.subcommand_matches("monitor") {
+        if !matches.is_present("f") {
+            check_permission();
+        }
         let cli_opt = arg_match_to_cliopt(&matches);
         handle_monitor(&cli_opt);
         exit(0);
     }
 
     if let Some(matches) = matches.subcommand_matches("query") {
+        if !matches.is_present("f") {
+            check_permission();
+        }
         let cli_opt = arg_match_to_cliopt(&matches);
         handle_query(&cli_opt);
         exit(0);

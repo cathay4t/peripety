@@ -98,6 +98,10 @@ Optional. Display events in JSON format. If not defined, display the event
 message only with timestamp only.
 Each event is devided by an empty line.
 
+\fB-f\fR
+Optional. Skip permission check. If not defined, only allows \fBroot\fR user or
+user in \fBsystemd-journal\fR group.
+
 .TP
 \fB--blk\fR \fI<BLOCK>\fR
 Optional. Only show event related to specified block. Support all types of
