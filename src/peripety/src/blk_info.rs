@@ -213,20 +213,14 @@ impl BlkInfo {
     pub fn to_json_string(&self) -> Result<String, PeripetyError> {
         match serde_json::to_string(&self) {
             Ok(s) => Ok(s),
-            Err(e) => Err(PeripetyError::JsonSerializeError(format!(
-                "{}",
-                e
-            ))),
+            Err(e) => Err(PeripetyError::JsonSerializeError(format!("{}", e))),
         }
     }
 
     pub fn to_json_string_pretty(&self) -> Result<String, PeripetyError> {
         match serde_json::to_string_pretty(&self) {
             Ok(s) => Ok(s),
-            Err(e) => Err(PeripetyError::JsonSerializeError(format!(
-                "{}",
-                e
-            ))),
+            Err(e) => Err(PeripetyError::JsonSerializeError(format!("{}", e))),
         }
     }
 
@@ -238,9 +232,7 @@ impl BlkInfo {
                     .expect("BUG: get_mount_point()")
                     // ^We never panic as it is null terminated.
                     .as_ptr(),
-                CStr::from_bytes_with_nul(b"r\0")
-                    .expect("BUG")
-                    .as_ptr(),
+                CStr::from_bytes_with_nul(b"r\0").expect("BUG").as_ptr(),
                 // ^We never panic as it is null terminated.
             )
         };

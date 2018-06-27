@@ -72,29 +72,20 @@ pub fn load_conf() -> Option<Conf> {
     let mut fd = match File::open(path) {
         Ok(fd) => fd,
         Err(e) => {
-            println!(
-                "Failed to open config file {}, error {}",
-                CONFIG_PATH, e
-            );
+            println!("Failed to open config file {}, error {}", CONFIG_PATH, e);
             return None;
         }
     };
     let mut contents = String::new();
     if let Err(e) = fd.read_to_string(&mut contents) {
-        println!(
-            "Fail to read config file {}, error {}",
-            CONFIG_PATH, e
-        );
+        println!("Fail to read config file {}, error {}", CONFIG_PATH, e);
         return None;
     }
 
     match toml::from_str(&contents) {
         Ok(c) => Some(c),
         Err(e) => {
-            println!(
-                "Fail to parse config file {}, error {}",
-                CONFIG_PATH, e
-            );
+            println!("Fail to parse config file {}, error {}", CONFIG_PATH, e);
             None
         }
     }

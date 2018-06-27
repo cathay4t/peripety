@@ -65,9 +65,7 @@ fn process_journal_entry(
         event.kdev = d.to_string();
     }
 
-    for regex_conf in buildin_regex_confs
-        .iter()
-        .chain(user_regex_confs.iter())
+    for regex_conf in buildin_regex_confs.iter().chain(user_regex_confs.iter())
     {
         // Save CPU if event.sub_system is defined and not matching with regex
         // config.
@@ -187,10 +185,7 @@ pub fn new(
         if let Err(e) =
             nix::sys::select::select(None, Some(&mut fds), None, None, None)
         {
-            println!(
-                "collector: Failed select against journal fd: {}",
-                e
-            );
+            println!("collector: Failed select against journal fd: {}", e);
             continue;
         }
         if !fds.contains(journal.as_raw_fd()) {

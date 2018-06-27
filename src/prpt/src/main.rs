@@ -326,10 +326,7 @@ fn handle_query(cli_opt: &CliOpt) {
     if let Some(since) = cli_opt.since {
         journal
             .seek_realtime_usec(since)
-            .expect(&format!(
-                "Unable to seek journal after {}",
-                since
-            ));
+            .expect(&format!("Unable to seek journal after {}", since));
     }
     for entry in &mut journal {
         match entry {
@@ -356,8 +353,7 @@ fn handle_info(blk: &str, is_json: bool) {
             if is_json {
                 to_stdout!(
                     "{}",
-                    i.to_json_string_pretty()
-                        .expect("BUG: handle_info()")
+                    i.to_json_string_pretty().expect("BUG: handle_info()")
                 );
             } else {
                 to_stdout!("blk_path           : {}", i.blk_path);

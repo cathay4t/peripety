@@ -19,6 +19,7 @@ mod scsi;
 use conf::ConfMain;
 use data::{EventType, ParserInfo};
 use peripety::StorageEvent;
+use std::io::{self, Write};
 use std::mem;
 use std::process::exit;
 use std::ptr;
@@ -30,10 +31,7 @@ use std::time::Duration;
 fn send_to_journald(event: &StorageEvent) {
     let mut logs = Vec::new();
     logs.push(("IS_PERIPETY".to_string(), "TRUE".to_string()));
-    logs.push((
-        "PRIORITY".to_string(),
-        format!("{}", event.severity as u8),
-    ));
+    logs.push(("PRIORITY".to_string(), format!("{}", event.severity as u8)));
     if !event.msg.is_empty() {
         logs.push(("MESSAGE".to_string(), event.msg.clone()));
     }
@@ -46,25 +44,14 @@ fn send_to_journald(event: &StorageEvent) {
         logs.push(("OWNERS_PATHS".to_string(), owners_path.clone()));
     }
     for (key, value) in &event.extension {
-        logs.push((
-            format!("EXT_{}", key.to_uppercase()),
-            value.clone(),
-        ));
+        logs.push((format!("EXT_{}", key.to_uppercase()), value.clone()));
     }
-    logs.push((
-        "EVENT_TYPE".to_string(),
-        event.event_type.clone(),
-    ));
+    logs.push(("EVENT_TYPE".to_string(), event.event_type.clone()));
     logs.push(("EVENT_ID".to_string(), event.event_id.clone()));
-    logs.push((
-        "SUB_SYSTEM".to_string(),
-        event.sub_system.to_string(),
-    ));
+    logs.push(("SUB_SYSTEM".to_string(), event.sub_system.to_string()));
     logs.push((
         "JSON".to_string(),
-        event
-            .to_json_string()
-            .expect("BUG: event.to_json_string()"),
+        event.to_json_string().expect("BUG: event.to_json_string()"),
     ));
     if let Err(e) = sdjournal::send_journal_list(&logs) {
         println!("Failed to save event to journald: {}", e);
@@ -74,15 +61,26 @@ fn send_to_journald(event: &StorageEvent) {
 fn handle_events_from_parsers(
     recver: &Receiver<StorageEvent>,
     parsers: &[ParserInfo],
-    daemon_conf: Option<ConfMain>,
+    daemon_conf_recv: &Receiver<ConfMain>,
 ) {
-    let mut skip_stdout = true;
-    if let Some(c) = daemon_conf {
-        if c.notify_stdout == Some(true) {
-            skip_stdout = false;
-        }
-    }
+    let mut notify_stdout = false;
+    let mut save_to_journald = true;
     loop {
+        if let Ok(conf) = daemon_conf_recv.try_recv() {
+            if let Some(v) = conf.notify_stdout {
+                notify_stdout = v;
+            } else {
+                // Use default value
+                notify_stdout = false;
+            }
+            if let Some(v) = conf.save_to_journald {
+                save_to_journald = v;
+            } else {
+                // Use default value
+                save_to_journald = true;
+            }
+        }
+
         let event = match recver.recv() {
             Ok(e) => e,
             Err(e) => {
@@ -92,35 +90,32 @@ fn handle_events_from_parsers(
         };
 
         // Send to stdout
-        if !skip_stdout {
+        if notify_stdout {
             if let Ok(s) = event.to_json_string_pretty() {
-                println!("{}", s);
+                let _ = writeln!(&mut io::stdout(), "{}", s);
             }
         }
 
         // Send to journald.
         // TODO(Gris Ge): Invoke a thread of this in case sdjournal slows us.
-        send_to_journald(&event);
+        if save_to_journald {
+            send_to_journald(&event);
+        }
 
         // Send to parser if parser require it.
         for parser in parsers {
-            let required = if parser
-                .filter_event_type
-                .contains(&EventType::Synthetic)
-            {
-                match parser.filter_event_subsys {
-                    None => true,
-                    Some(ref syss) => syss.contains(&event.sub_system),
-                }
-            } else {
-                false
-            };
+            let required =
+                if parser.filter_event_type.contains(&EventType::Synthetic) {
+                    match parser.filter_event_subsys {
+                        None => true,
+                        Some(ref syss) => syss.contains(&event.sub_system),
+                    }
+                } else {
+                    false
+                };
             if required {
                 if let Err(e) = parser.sender.send(event.clone()) {
-                    println!(
-                        "Failed to send synthetic event to parser: {}",
-                        e
-                    );
+                    println!("Failed to send synthetic event to parser: {}", e);
                 }
             }
         }
@@ -169,6 +164,7 @@ fn main() {
     let (collector_send, collector_recv) = mpsc::channel();
     let (notifier_send, notifier_recv) = mpsc::channel();
     let (conf_send, conf_recv) = mpsc::channel();
+    let (daemon_conf_send, daemon_conf_recv) = mpsc::channel();
     let mut parsers: Vec<ParserInfo> = Vec::new();
 
     let mut daemon_conf = None;
@@ -216,7 +212,7 @@ fn main() {
             handle_events_from_parsers(
                 &notifier_recv,
                 &parsers_clone,
-                daemon_conf,
+                &daemon_conf_recv,
             );
         })
         .expect("Failed to start 'handle_events_from_parsers' thread");
@@ -238,6 +234,12 @@ fn main() {
             .expect("Failed to send config to collector");
     }
 
+    if let Some(c) = daemon_conf {
+        daemon_conf_send
+            .send(c)
+            .expect("Failed to reload daemon config");
+    }
+
     println!("Peripetyd: Ready!");
 
     let mut sig: libc::signalfd_siginfo = unsafe { mem::uninitialized() };
@@ -249,10 +251,7 @@ fn main() {
         if let Err(e) =
             nix::sys::select::select(None, Some(&mut fds), None, None, None)
         {
-            println!(
-                "collector: Failed select against signal fd: {}",
-                e
-            );
+            println!("collector: Failed select against signal fd: {}", e);
             continue;
         }
         if fds.contains(sig_fd) {
@@ -272,7 +271,11 @@ fn main() {
         if let Some(c) = conf::load_conf() {
             println!("Config reloaded");
             if let Err(e) = conf_send.send(c.collector) {
-                println!("Failed to send config to collector: {}", e);
+                println!("failed to send config to collector: {}", e);
+                continue;
+            }
+            if let Err(e) = daemon_conf_send.send(c.main) {
+                println!("Failed to reload daemon config: {}", e);
                 continue;
             }
         }

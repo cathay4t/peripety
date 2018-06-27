@@ -33,9 +33,7 @@ fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {
             event.owners_paths = blk_info.owners_paths;
             event.owners_wwids.insert(0, blk_info.wwid);
             event.owners_paths.insert(0, blk_info.blk_path);
-            event
-                .extension
-                .insert("uuid".to_string(), uuid.clone());
+            event.extension.insert("uuid".to_string(), uuid.clone());
             event.dev_wwid = uuid;
 
             if event.sub_system == StorageSubSystem::FsExt4
@@ -53,9 +51,7 @@ fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {
                     "out journal" => "no_journal".to_string(),
                     _ => "unknown".to_string(),
                 };
-                event
-                    .extension
-                    .insert("data_mode".to_string(), data_mode);
+                event.extension.insert("data_mode".to_string(), data_mode);
             }
             for (key, value) in &event.extension {
                 event.msg = format!("{}, {}: '{}'", event.msg, key, value);

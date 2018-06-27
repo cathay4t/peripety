@@ -158,8 +158,10 @@ extern "C" {
 // if I can figure out how to call it I will delete this!!!
 pub fn error_string(errno: i32) -> String {
     extern "C" {
-        #[cfg_attr(any(target_os = "linux", target_env = "newlib"),
-                   link_name = "__xpg_strerror_r")]
+        #[cfg_attr(
+            any(target_os = "linux", target_env = "newlib"),
+            link_name = "__xpg_strerror_r"
+        )]
         fn strerror_r(
             errnum: c_int,
             buf: *mut c_char,
@@ -298,10 +300,7 @@ impl Journal {
         let rc =
             unsafe { sd_journal_get_realtime_usec(self.handle, &mut usec) };
         if rc == 0 {
-            result.insert(
-                "__REALTIME_TIMESTAMP".to_string(),
-                usec.to_string(),
-            );
+            result.insert("__REALTIME_TIMESTAMP".to_string(), usec.to_string());
         } else {
             return Err(SdJournalError::CError(ClibraryError::new(
                 String::from("Error on sd_journal_get_realtime_usec"),

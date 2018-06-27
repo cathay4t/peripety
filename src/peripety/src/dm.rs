@@ -70,12 +70,10 @@ pub(crate) fn blk_info_get_dm(blk: &str) -> Result<BlkInfo, PeripetyError> {
             if let Ok(slave_info) = BlkInfo::new_skip_extra(slave_blk) {
                 if !ret.owners_wwids.contains(&slave_info.wwid) {
                     ret.owners_wwids.push(slave_info.wwid.clone());
-                    ret.owners_types
-                        .push(slave_info.blk_type.clone());
+                    ret.owners_types.push(slave_info.blk_type.clone());
                 }
                 if !ret.owners_paths.contains(&slave_info.blk_path) {
-                    ret.owners_paths
-                        .push(slave_info.blk_path.clone());
+                    ret.owners_paths.push(slave_info.blk_path.clone());
                 }
                 if slave_info.blk_type == BlkType::DmLvm
                     || slave_info.blk_type == BlkType::Dm

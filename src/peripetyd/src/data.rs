@@ -101,10 +101,7 @@ impl Sysfs {
                 }
             }
             Err(e) => {
-                println!(
-                    "Sysfs::read(): Failed to read file {}: {}",
-                    path, e
-                );
+                println!("Sysfs::read(): Failed to read file {}: {}", path, e);
             }
         };
         contents

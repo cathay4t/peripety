@@ -43,10 +43,7 @@ fn iscsi_session_id_of_host(host_id: &str) -> Option<String> {
             }
         },
         Err(e) => {
-            println!(
-                "mpath_parser: Error when read_link {}: {}",
-                path, e
-            );
+            println!("mpath_parser: Error when read_link {}: {}", path, e);
             return None;
         }
     };
@@ -64,10 +61,7 @@ fn iscsi_session_id_of_host(host_id: &str) -> Option<String> {
             }
         }
         None => {
-            println!(
-                "mpath_parser: Failed to do regex parsing on {}",
-                p
-            );
+            println!("mpath_parser: Failed to do regex parsing on {}", p);
             return None;
         }
     };
@@ -75,10 +69,7 @@ fn iscsi_session_id_of_host(host_id: &str) -> Option<String> {
     let dir_entries = match fs::read_dir(&dev_path) {
         Ok(b) => b,
         Err(e) => {
-            println!(
-                "mpath_parser: Failed to read_dir {}: {}",
-                dev_path, e
-            );
+            println!("mpath_parser: Failed to read_dir {}: {}", dev_path, e);
             return None;
         }
     };
@@ -98,10 +89,8 @@ fn get_iscsi_info(host_id: &str) -> HashMap<String, String> {
     let mut ret = HashMap::new();
     if let Some(sid) = iscsi_session_id_of_host(host_id) {
         let session_dir = format!("/sys/class/iscsi_session/session{}", sid);
-        let conn_dir = format!(
-            "/sys/class/iscsi_connection/connection{}:0",
-            sid
-        );
+        let conn_dir =
+            format!("/sys/class/iscsi_connection/connection{}:0", sid);
         if !Path::new(&session_dir).exists() {
             return ret;
         }
@@ -168,10 +157,7 @@ fn get_fc_info(host_id: &str, scsi_id: &str) -> HashMap<String, String> {
 }
 
 fn is_iscsi_host(host_id: &str) -> bool {
-    Path::new(&format!(
-        "/sys/class/iscsi_host/host{}",
-        host_id
-    )).exists()
+    Path::new(&format!("/sys/class/iscsi_host/host{}", host_id)).exists()
 }
 
 fn is_fc_host(host_id: &str) -> bool {
@@ -310,38 +296,31 @@ fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {
                     return;
                 }
             };
-            event.extension.insert(
-                "blk_major_minor".to_string(),
-                event.kdev.clone(),
-            );
+            event
+                .extension
+                .insert("blk_major_minor".to_string(), event.kdev.clone());
             if let Err(e) = sender.send(event) {
                 println!("mpath_parser: Failed to send event: {}", e);
             }
         }
-        _ => println!(
-            "mpath: Got unknown event type: {}",
-            event.event_type
-        ),
+        _ => println!("mpath: Got unknown event type: {}", event.event_type),
     };
 }
 
 pub fn parser_start(sender: Sender<StorageEvent>) -> ParserInfo {
     let (event_in_sender, event_in_recver) = mpsc::channel();
 
-    if let Err(e) = Builder::new()
-        .name("mpath_parser".into())
-        .spawn(move || loop {
+    if let Err(e) = Builder::new().name("mpath_parser".into()).spawn(
+        move || loop {
             match event_in_recver.recv() {
                 Ok(event) => parse_event(&event, &sender),
                 Err(e) => {
                     println!("mpath_parser: Failed to retrieve event: {}", e)
                 }
             };
-        }) {
-        panic!(
-            "mpath_parser: Failed to create parser thread: {}",
-            e
-        );
+        },
+    ) {
+        panic!("mpath_parser: Failed to create parser thread: {}", e);
     }
 
     ParserInfo {

@@ -66,9 +66,10 @@ impl FromStr for StorageSubSystem {
             "XFS" => Ok(StorageSubSystem::FsXfs),
             "NVME" => Ok(StorageSubSystem::Nvme),
             "JBD2" => Ok(StorageSubSystem::FsJbd2),
-            _ => Err(PeripetyError::StorageSubSystemParseError(
-                format!("Invalid StorageSubSystem string {}", s),
-            )),
+            _ => Err(PeripetyError::StorageSubSystemParseError(format!(
+                "Invalid StorageSubSystem string {}",
+                s
+            ))),
         }
     }
 }
@@ -135,19 +136,13 @@ impl StorageEvent {
     pub fn to_json_string(&self) -> Result<String, PeripetyError> {
         match serde_json::to_string(&self) {
             Ok(s) => Ok(s),
-            Err(e) => Err(PeripetyError::JsonSerializeError(format!(
-                "{}",
-                e
-            ))),
+            Err(e) => Err(PeripetyError::JsonSerializeError(format!("{}", e))),
         }
     }
     pub fn to_json_string_pretty(&self) -> Result<String, PeripetyError> {
         match serde_json::to_string_pretty(&self) {
             Ok(s) => Ok(s),
-            Err(e) => Err(PeripetyError::JsonSerializeError(format!(
-                "{}",
-                e
-            ))),
+            Err(e) => Err(PeripetyError::JsonSerializeError(format!("{}", e))),
         }
     }
     pub fn from_json_string(
@@ -155,10 +150,9 @@ impl StorageEvent {
     ) -> Result<StorageEvent, PeripetyError> {
         match serde_json::from_str(json_string) {
             Ok(e) => Ok(e),
-            Err(e) => Err(PeripetyError::JsonDeserializeError(format!(
-                "{}",
-                e
-            ))),
+            Err(e) => {
+                Err(PeripetyError::JsonDeserializeError(format!("{}", e)))
+            }
         }
     }
     pub fn from_slice(buff: &[u8]) -> Result<StorageEvent, PeripetyError> {
@@ -175,10 +169,9 @@ impl StorageEvent {
         };
         match serde_json::from_str(tmp_s) {
             Ok(e) => Ok(e),
-            Err(e) => Err(PeripetyError::JsonDeserializeError(format!(
-                "{}",
-                e
-            ))),
+            Err(e) => {
+                Err(PeripetyError::JsonDeserializeError(format!("{}", e)))
+            }
         }
     }
 }
