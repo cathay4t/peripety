@@ -42,8 +42,10 @@ pub struct BlkInfo {
     pub owners_wwids: Vec<String>,
     pub owners_types: Vec<BlkType>,
     pub owners_paths: Vec<String>,
+    pub owners_transport_ids: Vec<String>,
     pub uuid: Option<String>,
     pub mount_point: Option<String>,
+    pub transport_id: String,
 }
 
 impl BlkInfo {
@@ -59,6 +61,11 @@ impl BlkInfo {
             bi.mount_point = BlkInfo::get_mount_point(&bi.blk_path);
         }
         Ok(bi)
+    }
+
+    pub fn list() -> Result<Vec<BlkInfo>, PeripetyError> {
+        // Try dm first as multipath might contain many slaves.
+        Ok(vec![])
     }
 
     pub fn new_skip_extra(blk: &str) -> Result<BlkInfo, PeripetyError> {

@@ -12,6 +12,7 @@ static CONFIG_PATH: &'static str = "/etc/peripetyd.conf";
 pub struct ConfMain {
     pub notify_stdout: Option<bool>,
     pub save_to_journald: Option<bool>,
+    pub dump_blk_info_at_start: Option<bool>,
 }
 
 #[derive(Deserialize, Debug)]

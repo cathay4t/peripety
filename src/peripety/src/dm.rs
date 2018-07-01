@@ -38,8 +38,10 @@ pub(crate) fn blk_info_get_dm(blk: &str) -> Result<BlkInfo, PeripetyError> {
             owners_wwids: Vec::new(),
             owners_types: Vec::new(),
             owners_paths: Vec::new(),
+            owners_transport_ids: Vec::new(),
             uuid: None,
             mount_point: None,
+            transport_id: "".to_string(),
         };
         if ret.wwid.starts_with("LVM-") {
             ret.blk_type = BlkType::DmLvm;
@@ -74,6 +76,7 @@ pub(crate) fn blk_info_get_dm(blk: &str) -> Result<BlkInfo, PeripetyError> {
                 }
                 if !ret.owners_paths.contains(&slave_info.blk_path) {
                     ret.owners_paths.push(slave_info.blk_path.clone());
+                    ret.owners_transport_ids.push(slave_info.transport_id);
                 }
                 if slave_info.blk_type == BlkType::DmLvm
                     || slave_info.blk_type == BlkType::Dm
@@ -105,6 +108,8 @@ pub(crate) fn blk_info_get_dm(blk: &str) -> Result<BlkInfo, PeripetyError> {
                                 .contains(&sub_slave_info.blk_path)
                             {
                                 ret.owners_paths.push(sub_slave_info.blk_path);
+                                ret.owners_transport_ids
+                                    .push(sub_slave_info.transport_id);
                             }
                         }
                     }

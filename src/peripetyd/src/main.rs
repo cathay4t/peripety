@@ -166,11 +166,15 @@ fn main() {
     let (conf_send, conf_recv) = mpsc::channel();
     let (daemon_conf_send, daemon_conf_recv) = mpsc::channel();
     let mut parsers: Vec<ParserInfo> = Vec::new();
+    let mut dump_blk_info = true;
 
     let mut daemon_conf = None;
     let mut collector_conf = None;
     if let Some(c) = conf::load_conf() {
         daemon_conf = Some(c.main);
+        if daemon_conf.dump_blk_info_at_start == Some(false) {
+            dump_blk_info = false;
+        }
         collector_conf = Some(c.collector);
     }
 
@@ -241,6 +245,10 @@ fn main() {
     }
 
     println!("Peripetyd: Ready!");
+
+    if dump_blk_info {
+        notifier_recv
+    }
 
     let mut sig: libc::signalfd_siginfo = unsafe { mem::uninitialized() };
     let sig_size = std::mem::size_of::<libc::signalfd_siginfo>();

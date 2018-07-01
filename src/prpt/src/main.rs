@@ -356,23 +356,25 @@ fn handle_info(blk: &str, is_json: bool) {
                     i.to_json_string_pretty().expect("BUG: handle_info()")
                 );
             } else {
-                to_stdout!("blk_path           : {}", i.blk_path);
-                to_stdout!("preferred_blk_path : {}", i.preferred_blk_path);
-                to_stdout!("blk_type           : {}", i.blk_type);
-                to_stdout!("wwid               : {}", i.wwid);
-                to_stdout!("owners_wwids       : {:?}", i.owners_wwids);
-                to_stdout!("owners_paths       : {:?}", i.owners_paths);
+                to_stdout!("blk_path             : {}", i.blk_path);
+                to_stdout!("preferred_blk_path   : {}", i.preferred_blk_path);
+                to_stdout!("blk_type             : {}", i.blk_type);
+                to_stdout!("wwid                 : {}", i.wwid);
+                to_stdout!("transport_id         : {}", i.transport_id);
+                to_stdout!("owners_wwids         : {:?}", i.owners_wwids);
+                to_stdout!("owners_paths         : {:?}", i.owners_paths);
                 let mut types = Vec::new();
                 for t in i.owners_types {
                     types.push(format!("{}", t));
                 }
-                to_stdout!("owners_types       : {:?}", types);
+                to_stdout!("owners_types         : {:?}", types);
+                to_stdout!("owners_transport_ids : {:?}", i.owners_transport_ids);
                 to_stdout!(
-                    "uuid               : {}",
+                    "uuid                 : {}",
                     i.uuid.unwrap_or_else(|| "".to_string())
                 );
                 to_stdout!(
-                    "mount_point        : {}",
+                    "mount_point          : {}",
                     i.mount_point.unwrap_or_else(|| "".to_string())
                 );
             }
