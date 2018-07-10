@@ -3,6 +3,10 @@ name = "peripetyd"
 version = "0.1.2"
 authors = ["Gris Ge <fge@redhat.com>"]
 
+[[bin]]
+name = "peripetyd"
+path = "main.rs"
+
 [dependencies]
 peripety = { path = "../peripety", version = "*"}
 sdjournal = { path = "../sdjournal", version = "*"}

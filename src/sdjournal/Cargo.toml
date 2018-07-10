@@ -3,5 +3,9 @@ name = "sdjournal"
 version = "0.1.0"
 authors = ["Tony Asleson <tasleson@redhat.com>"]
 
+[lib]
+name = "sdjournal"
+path = "lib.rs"
+
 [dependencies]
 libc = ">=0.2"
