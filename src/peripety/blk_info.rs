@@ -3,13 +3,12 @@ use super::error::PeripetyError;
 use super::scsi;
 use super::sysfs::Sysfs;
 
-use libc;
+use libmount::mountinfo;
 use regex::Regex;
 use serde_json;
-use std::ffi::CStr;
-use std::ffi::CString;
 use std::fmt;
 use std::fs;
+use std::io::Read;
 use std::path::Path;
 
 #[derive(Clone, PartialEq, Debug, Serialize)]
@@ -64,8 +63,57 @@ impl BlkInfo {
     }
 
     pub fn list() -> Result<Vec<BlkInfo>, PeripetyError> {
+        // Steps:
+        //  1. Enumerate /sys/class/block/ folder.
+        //  2. Query dm-[0-9]+
+        //  3. Query sd[a-z]+, if already included by above, skip.
+        //  4. Query nvme[0-9]+n[0-9]+. TODO
         // Try dm first as multipath might contain many slaves.
-        Ok(vec![])
+        let dir_entries = match fs::read_dir("/sys/class/block") {
+            Ok(d) => d,
+            Err(e) => {
+                return Err(PeripetyError::InternalBug(format!(
+                    "Failed to read dir /sys/class/block: {}",
+                    e
+                )))
+            }
+        };
+        let mut dm_devs = Vec::new();
+        let mut other_devs = Vec::new();
+
+        for entry in dir_entries {
+            if let Ok(e) = entry {
+                if let Ok(name) = e.file_name().into_string() {
+                    if name.starts_with("dm-") {
+                        dm_devs.push(name);
+                    } else {
+                        other_devs.push(name);
+                    }
+                }
+            }
+        }
+
+        let mut ret = Vec::new();
+
+        for dm_dev in &dm_devs {
+            let info = BlkInfo::new(&dm_dev)?;
+            if info.blk_type == BlkType::DmMultipath {
+                for owner in info.owners_paths {
+                    let blk_name = match owner.rfind('/') {
+                        Some(i) => &owner[i + 1..],
+                        None => owner.as_str(),
+                    };
+                    other_devs.retain(|x| x != blk_name);
+                }
+            }
+            ret.push(BlkInfo::new(&dm_dev)?);
+        }
+
+        for other_dev in &other_devs {
+            ret.push(BlkInfo::new(&other_dev)?);
+        }
+
+        Ok(ret)
     }
 
     pub fn new_skip_extra(blk: &str) -> Result<BlkInfo, PeripetyError> {
@@ -232,42 +280,27 @@ impl BlkInfo {
     }
 
     pub fn get_mount_point(blk_path: &str) -> Option<String> {
-        let mut ret = String::new();
-        let fd = unsafe {
-            libc::setmntent(
-                CStr::from_bytes_with_nul(b"/proc/mounts\0")
-                    .expect("BUG: get_mount_point()")
-                    // ^We never panic as it is null terminated.
-                    .as_ptr(),
-                CStr::from_bytes_with_nul(b"r\0").expect("BUG").as_ptr(),
-                // ^We never panic as it is null terminated.
-            )
-        };
-        if fd.is_null() {
-            return None;
-        }
-        let mut entry = unsafe { libc::getmntent(fd) };
-        while !entry.is_null() {
-            let table: libc::mntent = unsafe { *entry };
-            if let Ok(mnt_fsname) =
-                unsafe { CStr::from_ptr(table.mnt_fsname).to_str() }
-            {
-                if mnt_fsname == blk_path {
-                    if let Ok(s) = unsafe {
-                        CString::from_raw(table.mnt_dir).into_string()
-                    } {
-                        ret = s;
-                        break;
+        let mut fd = fs::File::open("/proc/self/mountinfo").unwrap();
+        let mut data = Vec::new();
+        fd.read_to_end(&mut data).unwrap();
+
+        for e in mountinfo::Parser::new(&data) {
+            if let Ok(m) = e {
+                // TODO(Gris Ge): we should use read_link() to compare blk_path
+                // and mount_source.
+                if let Some(mount_source) = m.mount_source.into_owned().to_str()
+                {
+                    if let Some(mount_point) =
+                        m.mount_point.into_owned().to_str()
+                    {
+                        if mount_source == blk_path {
+                            return Some(format!("{}", mount_point));
+                        }
                     }
                 }
-                entry = unsafe { libc::getmntent(fd) };
             }
         }
-        unsafe { libc::endmntent(fd) };
-        if ret.is_empty() {
-            return None;
-        }
-        Some(ret)
+        None
     }
 
     pub fn major_minor_to_blk_name(

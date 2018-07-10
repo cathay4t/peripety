@@ -347,40 +347,57 @@ fn handle_query(cli_opt: &CliOpt) {
 }
 
 #[allow(unused_must_use)]
+fn to_stdout_blk_info(i: BlkInfo, is_json: bool) {
+    if is_json {
+        to_stdout!(
+            "{}",
+            i.to_json_string_pretty().expect("BUG: handle_info()")
+        );
+    } else {
+        to_stdout!("blk_path             : {}", i.blk_path);
+        to_stdout!("preferred_blk_path   : {}", i.preferred_blk_path);
+        to_stdout!("blk_type             : {}", i.blk_type);
+        to_stdout!("wwid                 : {}", i.wwid);
+        to_stdout!("transport_id         : {}", i.transport_id);
+        to_stdout!("owners_wwids         : {:?}", i.owners_wwids);
+        to_stdout!("owners_paths         : {:?}", i.owners_paths);
+        let mut types = Vec::new();
+        for t in i.owners_types {
+            types.push(format!("{}", t));
+        }
+        to_stdout!("owners_types         : {:?}", types);
+        to_stdout!("owners_transport_ids : {:?}", i.owners_transport_ids);
+        to_stdout!(
+            "uuid                 : {}",
+            i.uuid.unwrap_or_else(|| "".to_string())
+        );
+        to_stdout!(
+            "mount_point          : {}",
+            i.mount_point.unwrap_or_else(|| "".to_string())
+        );
+    }
+}
+
 fn handle_info(blk: &str, is_json: bool) {
     match BlkInfo::new(blk) {
-        Ok(i) => {
-            if is_json {
-                to_stdout!(
-                    "{}",
-                    i.to_json_string_pretty().expect("BUG: handle_info()")
-                );
-            } else {
-                to_stdout!("blk_path             : {}", i.blk_path);
-                to_stdout!("preferred_blk_path   : {}", i.preferred_blk_path);
-                to_stdout!("blk_type             : {}", i.blk_type);
-                to_stdout!("wwid                 : {}", i.wwid);
-                to_stdout!("transport_id         : {}", i.transport_id);
-                to_stdout!("owners_wwids         : {:?}", i.owners_wwids);
-                to_stdout!("owners_paths         : {:?}", i.owners_paths);
-                let mut types = Vec::new();
-                for t in i.owners_types {
-                    types.push(format!("{}", t));
-                }
-                to_stdout!("owners_types         : {:?}", types);
-                to_stdout!("owners_transport_ids : {:?}", i.owners_transport_ids);
-                to_stdout!(
-                    "uuid                 : {}",
-                    i.uuid.unwrap_or_else(|| "".to_string())
-                );
-                to_stdout!(
-                    "mount_point          : {}",
-                    i.mount_point.unwrap_or_else(|| "".to_string())
-                );
-            }
-        }
+        Ok(i) => to_stdout_blk_info(i, is_json),
         Err(e) => quit_with_msg(&format!("{}", e)),
     };
+}
+
+#[allow(unused_must_use)]
+fn handle_list(is_json: bool) {
+    match BlkInfo::list() {
+        Ok(blk_infos) => {
+            for blk_info in blk_infos {
+                to_stdout_blk_info(blk_info, is_json);
+                to_stdout!("\n");
+            }
+        }
+        Err(e) => {
+            quit_with_msg(&format!("Failed to list current blocks: {}", e))
+        }
+    }
 }
 
 fn check_permission() {
@@ -473,6 +490,11 @@ fn main() {
                 ))
                 .arg(&json_arg),
         )
+        .subcommand(
+            SubCommand::with_name("list")
+                .about("List current blocks")
+                .arg(&json_arg),
+        )
         .get_matches();
 
     if let Some(matches) = matches.subcommand_matches("monitor") {
@@ -499,6 +521,12 @@ fn main() {
             Some(s) => handle_info(s, is_json),
             None => quit_with_msg("Invalid 'blk' argument"),
         }
+        exit(0);
+    }
+
+    if let Some(matches) = matches.subcommand_matches("list") {
+        let is_json = matches.is_present("J");
+        handle_list(is_json);
         exit(0);
     }
 }

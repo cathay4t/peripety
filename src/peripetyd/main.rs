@@ -7,6 +7,7 @@ extern crate serde_derive;
 extern crate chrono;
 extern crate libc;
 extern crate toml;
+extern crate uuid;
 
 mod buildin_regex;
 mod collector;
@@ -16,17 +17,22 @@ mod fs;
 mod mpath;
 mod scsi;
 
+use chrono::{Local, SecondsFormat};
 use conf::ConfMain;
 use data::{EventType, ParserInfo};
-use peripety::StorageEvent;
+use libc::{c_char, size_t};
+use peripety::{BlkInfo, LogSeverity, StorageEvent, StorageSubSystem};
+use std::collections::HashMap;
+use std::ffi::CStr;
 use std::io::{self, Write};
 use std::mem;
 use std::process::exit;
 use std::ptr;
 use std::sync::mpsc;
-use std::sync::mpsc::Receiver;
+use std::sync::mpsc::{Receiver, Sender};
 use std::thread::{sleep, Builder};
 use std::time::Duration;
+use uuid::Uuid;
 
 fn send_to_journald(event: &StorageEvent) {
     let mut logs = Vec::new();
@@ -171,10 +177,10 @@ fn main() {
     let mut daemon_conf = None;
     let mut collector_conf = None;
     if let Some(c) = conf::load_conf() {
-        daemon_conf = Some(c.main);
-        if daemon_conf.dump_blk_info_at_start == Some(false) {
+        if c.main.dump_blk_info_at_start == Some(false) {
             dump_blk_info = false;
         }
+        daemon_conf = Some(c.main);
         collector_conf = Some(c.collector);
     }
 
@@ -247,7 +253,7 @@ fn main() {
     println!("Peripetyd: Ready!");
 
     if dump_blk_info {
-        notifier_recv
+        dump_blk_infos(&notifier_send);
     }
 
     let mut sig: libc::signalfd_siginfo = unsafe { mem::uninitialized() };
@@ -287,5 +293,61 @@ fn main() {
                 continue;
             }
         }
+    }
+}
+
+const HOST_NAME_MAX: usize = 64;
+
+fn gethostname() -> String {
+    let mut buf = [0u8; HOST_NAME_MAX];
+    let rc = unsafe {
+        libc::gethostname(
+            buf.as_mut_ptr() as *mut c_char,
+            HOST_NAME_MAX as size_t,
+        )
+    };
+
+    if rc != 0 {
+        panic!("Failed to gethostname(): error {}", rc);
+    }
+
+    unsafe {
+        CStr::from_bytes_with_nul_unchecked(&buf)
+            .to_str()
+            .expect("Got invalid utf8 from gethostname()")
+            .trim_right_matches('\0')
+            .to_string()
+    }
+}
+
+fn dump_blk_infos(notifier_send: &Sender<StorageEvent>) {
+    let blk_infos = BlkInfo::list().expect("Failed to query existing blocks");
+    for blk_info in blk_infos {
+        let msg = match blk_info.mount_point {
+            Some(mount_point) => format!(
+                "Found block '{}' mounted at '{}'",
+                &blk_info.blk_path, &mount_point
+            ),
+            None => format!("Found block '{}'", &blk_info.blk_path),
+        };
+        notifier_send
+            .send(StorageEvent {
+                hostname: gethostname(),
+                severity: LogSeverity::Info,
+                sub_system: StorageSubSystem::Other,
+                timestamp: Local::now()
+                    .to_rfc3339_opts(SecondsFormat::Micros, false),
+                event_id: Uuid::new_v4().hyphenated().to_string(),
+                event_type: "PERIPETY_BLK_INFO".to_string(),
+                dev_wwid: blk_info.wwid,
+                dev_path: blk_info.blk_path,
+                owners_wwids: blk_info.owners_wwids,
+                owners_paths: blk_info.owners_paths,
+                kdev: "".to_string(),
+                msg: msg.clone(),
+                raw_msg: msg,
+                extension: HashMap::new(),
+            })
+            .expect("Failed to send block information event");
     }
 }

@@ -30,6 +30,7 @@ extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate libc;
+extern crate libmount;
 extern crate regex;
 extern crate serde_json;
 

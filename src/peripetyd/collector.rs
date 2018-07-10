@@ -13,6 +13,7 @@ use sdjournal;
 use std::collections::HashMap;
 use std::os::unix::io::AsRawFd;
 use std::sync::mpsc::{Receiver, Sender};
+use uuid::Uuid;
 
 use buildin_regex::BUILD_IN_REGEX_CONFS;
 use conf::ConfCollector;
@@ -147,7 +148,8 @@ fn process_journal_entry(
     }
 
     event.raw_msg = msg.to_string();
-    //TODO(Gris Ge): Generate event_id here.
+    //TODO(Gris Ge): Grouping events by re-using event_id.
+    event.event_id = Uuid::new_v4().hyphenated().to_string();
 
     //TODO(Gris Ge): Need to skip journal entry when that one is created by
     //               peripety.

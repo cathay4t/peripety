@@ -392,10 +392,7 @@ fn get_transport_id(sd_name: &str) -> Result<String, PeripetyError> {
                 ))
             // ^ get_iscsi_info() has already ensured these keys exist.
             } else if t == "FC" {
-                Ok(format!(
-                    "{},{}",
-                    info["host_wwpn"], info["target_wwpn"]
-                ))
+                Ok(format!("{},{}", info["host_wwpn"], info["target_wwpn"]))
             // ^ get_fc_info() has already ensured these keys exist.
             } else {
                 Ok("".to_string())
