@@ -196,7 +196,7 @@ fn get_scsi_transport_info(sd_name: &str) -> HashMap<String, String> {
     ret
 }
 
-fn get_mpath_info_from_blk(major_minor: &str) -> Option<(String, String)> {
+fn get_mpath_name_from_blk(major_minor: &str) -> Option<(String)> {
     // We use sysfs information to speed up things without cacheing.
     // TODO(Gris Ge): This function should return Result<>
     let sysfs_holder_dir = format!("/sys/dev/block/{}/holders", major_minor);
@@ -227,8 +227,7 @@ fn get_mpath_info_from_blk(major_minor: &str) -> Option<(String, String)> {
             let uuid_path = format!("{}/dm/uuid", dm);
             let mut uuid = Sysfs::read(&uuid_path);
             if uuid.starts_with("mpath-") {
-                uuid = uuid["mpath-".len()..].to_string();
-                return Some((Sysfs::read(&name_path), uuid));
+                return Some(Sysfs::read(&name_path));
             }
         }
         Some(Err(e)) => println!(
@@ -243,13 +242,12 @@ fn get_mpath_info_from_blk(major_minor: &str) -> Option<(String, String)> {
 fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {
     match event.event_type.as_ref() {
         "DM_MPATH_PATH_FAILED" | "DM_MPATH_PATH_REINSTATED" => {
-            let (name, uuid) = match get_mpath_info_from_blk(&event.kdev) {
+            let name = match get_mpath_name_from_blk(&event.kdev) {
                 Some(t) => t,
                 None => return,
             };
             let mut event = event.clone();
-            event.dev_path = format!("/dev/mapper/{}", name);
-            event.dev_wwid = uuid;
+            let dev_path = format!("/dev/mapper/{}", name);
             let path_blk_name =
                 match BlkInfo::major_minor_to_blk_name(&event.kdev) {
                     Ok(b) => b,
@@ -258,16 +256,12 @@ fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {
                         return;
                     }
                 };
-            event.msg = format!(
-                "{} mpath_wwid: {}, path_blk_name: {}",
-                event.raw_msg, event.dev_wwid, path_blk_name
-            );
-            let dm_name = match get_dm_name(&event.dev_path) {
+            let dm_name = match get_dm_name(&dev_path) {
                 Some(d) => d,
                 None => {
                     println!(
                         "mpath_parser: Failed to find dm_name for {}",
-                        &event.dev_path
+                        &dev_path
                     );
                     return;
                 }
@@ -275,8 +269,11 @@ fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {
 
             match BlkInfo::new(&dm_name) {
                 Ok(blk_info) => {
-                    event.owners_wwids = blk_info.owners_wwids;
-                    event.owners_paths = blk_info.owners_paths;
+                    event.msg = format!(
+                        "{} mpath_wwid: {}, path_blk_name: {}",
+                        event.raw_msg, event.blk_info.wwid, path_blk_name
+                    );
+                    event.blk_info = blk_info;
                     if let Ok(pbi) = BlkInfo::new_skip_extra(&path_blk_name) {
                         if pbi.blk_type == BlkType::Scsi {
                             // Check for iSCSI/FC/FCoE informations.

@@ -15,8 +15,7 @@ fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {
     match BlkInfo::new_skip_extra(kdev) {
         Ok(b) => {
             let mut event = event.clone();
-            event.dev_path = b.blk_path;
-            event.dev_wwid = b.wwid;
+            event.blk_info = b;
             if event.event_type == "SCSI_SENSE_KEY" {
                 if let Some(sense_key) = event.extension.get("sense_key") {
                     match sense_key.as_ref() {
@@ -33,7 +32,7 @@ fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {
                 }
             }
             event.msg =
-                format!("{}, wwid: '{}'", event.raw_msg, event.dev_wwid);
+                format!("{}, wwid: '{}'", event.raw_msg, event.blk_info.wwid);
             if let Err(e) = sender.send(event) {
                 println!("scsi_parser: Failed to send event: {}", e);
             }

@@ -97,22 +97,13 @@ pub(crate) fn blk_info_get_scsi(blk: &str) -> Result<BlkInfo, PeripetyError> {
             } else {
                 get_prefered_blk_path(&blk_path)
             };
-            let mut ret = BlkInfo {
-                wwid: format!("{}-part{}", blk_info.wwid, part),
-                blk_type: BlkType::Partition,
-                blk_path,
-                preferred_blk_path,
-                uuid,
-                owners_wwids: blk_info.owners_wwids,
-                owners_types: blk_info.owners_types,
-                owners_paths: blk_info.owners_paths,
-                owners_transport_ids: blk_info.owners_transport_ids,
-                mount_point: None,
-                transport_id: "".to_string(),
-            };
-            ret.owners_wwids.insert(0, blk_info.wwid);
-            ret.owners_types.insert(0, blk_info.blk_type);
-            ret.owners_paths.insert(0, blk_info.blk_path);
+            let mut ret: BlkInfo = Default::default();
+            ret.wwid = format!("{}-part{}", blk_info.wwid, part);
+            ret.blk_type = BlkType::Partition;
+            ret.blk_path = blk_path;
+            ret.preferred_blk_path = preferred_blk_path;
+            ret.uuid = uuid;
+            ret.owners = vec![blk_info];
             return Ok(ret);
         }
     }
@@ -129,19 +120,13 @@ pub(crate) fn blk_info_get_scsi(blk: &str) -> Result<BlkInfo, PeripetyError> {
 
     if Path::new(&sysfs_path).exists() {
         let blk_path = format!("/dev/{}", &name);
-        return Ok(BlkInfo {
-            wwid: pretty_wwid(&Sysfs::read(&sysfs_path)?),
-            blk_type: BlkType::Scsi,
-            preferred_blk_path: get_prefered_blk_path(&blk_path),
-            blk_path,
-            owners_wwids: Vec::new(),
-            owners_types: Vec::new(),
-            owners_paths: Vec::new(),
-            owners_transport_ids: Vec::new(),
-            uuid: None,
-            mount_point: None,
-            transport_id: get_transport_id(&name)?,
-        });
+        let mut ret: BlkInfo = Default::default();
+        ret.wwid = pretty_wwid(&Sysfs::read(&sysfs_path)?);
+        ret.blk_type = BlkType::Scsi;
+        ret.preferred_blk_path = get_prefered_blk_path(&blk_path);
+        ret.blk_path = blk_path;
+        ret.transport_id = get_transport_id(&name)?;
+        return Ok(ret);
     }
 
     Err(PeripetyError::InternalBug(format!(
@@ -261,10 +246,11 @@ fn get_iscsi_info(
             conn_dir
         )));
     }
-    ret.insert(
-        "address".to_string(),
-        Sysfs::read(&format!("{}/{}", conn_dir, "address"))?,
-    );
+    let mut address = Sysfs::read(&format!("{}/{}", conn_dir, "address"))?;
+    if address.as_str() == "0000:0000:0000:0000:0000:0000:0000:0001" {
+        address = "::1".to_string();
+    }
+    ret.insert("address".to_string(), address);
     ret.insert(
         "port".to_string(),
         Sysfs::read(&format!("{}/{}", conn_dir, "port"))?,

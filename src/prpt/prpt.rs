@@ -191,15 +191,7 @@ fn arg_match_to_cliopt(matches: &ArgMatches) -> CliOpt {
 
     if matches.is_present("blk") {
         match matches.value_of("blk") {
-            Some(s) => {
-                ret.blk_info = match BlkInfo::new_skip_extra(&s) {
-                    Ok(b) => Some(b),
-                    Err(e) => {
-                        quit_with_msg(&format!("Invalid blk option: {}", e));
-                        None
-                    }
-                };
-            }
+            Some(s) => ret.blk_info = get_blk_info(&s),
             None => quit_with_msg("Invalid blk option"),
         };
     }
@@ -230,8 +222,16 @@ fn handle_event(event: &StorageEvent, cli_opt: &CliOpt) {
     }
 
     if let Some(ref b) = cli_opt.blk_info {
-        if event.dev_wwid != b.wwid && !event.owners_wwids.contains(&b.wwid) {
-            is_match = false;
+        is_match = false;
+        if event.blk_info.wwid == b.wwid {
+            is_match = true;
+        } else {
+            for owner_info in &b.owners {
+                if owner_info.wwid == event.blk_info.wwid {
+                    is_match = true;
+                    break;
+                }
+            }
         }
     }
 
@@ -347,51 +347,126 @@ fn handle_query(cli_opt: &CliOpt) {
 }
 
 #[allow(unused_must_use)]
-fn to_stdout_blk_info(i: BlkInfo, is_json: bool) {
+fn to_stdout_blk_info(
+    i: &BlkInfo,
+    is_json: bool,
+    is_simple: bool,
+    prefix: &str,
+) {
     if is_json {
         to_stdout!(
             "{}",
             i.to_json_string_pretty().expect("BUG: handle_info()")
         );
     } else {
-        to_stdout!("blk_path             : {}", i.blk_path);
-        to_stdout!("preferred_blk_path   : {}", i.preferred_blk_path);
-        to_stdout!("blk_type             : {}", i.blk_type);
-        to_stdout!("wwid                 : {}", i.wwid);
-        to_stdout!("transport_id         : {}", i.transport_id);
-        to_stdout!("owners_wwids         : {:?}", i.owners_wwids);
-        to_stdout!("owners_paths         : {:?}", i.owners_paths);
-        let mut types = Vec::new();
-        for t in i.owners_types {
-            types.push(format!("{}", t));
+        if is_simple {
+            if let Some(l) = i.blk_path.rfind('/') {
+                if let Some(ref m) = i.mount_point {
+                    to_stdout!(
+                        "{}{} : {} : {}",
+                        prefix,
+                        &i.blk_path[l + 1..],
+                        i.wwid,
+                        m
+                    );
+                } else {
+                    to_stdout!(
+                        "{}{} : {}",
+                        prefix,
+                        &i.blk_path[l + 1..],
+                        i.wwid
+                    );
+                }
+            }
+        } else {
+            to_stdout!("{}blk_path     : {}", prefix, i.blk_path);
+            to_stdout!("{}preferred    : {}", prefix, i.preferred_blk_path);
+            to_stdout!("{}blk_type     : {}", prefix, i.blk_type);
+            to_stdout!("{}wwid         : {}", prefix, i.wwid);
+            to_stdout!("{}transport_id : {}", prefix, i.transport_id);
+            let uuid = match i.uuid {
+                Some(ref u) => u,
+                None => "",
+            };
+            to_stdout!("{}uuid         : {}", prefix, uuid);
+            let mp = match i.mount_point {
+                Some(ref m) => m,
+                None => "",
+            };
+            to_stdout!("{}mount_point  : {}", prefix, mp);
         }
-        to_stdout!("owners_types         : {:?}", types);
-        to_stdout!("owners_transport_ids : {:?}", i.owners_transport_ids);
-        to_stdout!(
-            "uuid                 : {}",
-            i.uuid.unwrap_or_else(|| "".to_string())
-        );
-        to_stdout!(
-            "mount_point          : {}",
-            i.mount_point.unwrap_or_else(|| "".to_string())
-        );
+        if prefix == "" && !i.owners.is_empty() {
+            if !is_simple {
+                to_stdout!("{}owners       :", prefix);
+            }
+            for owner_info in &i.owners {
+                to_stdout_blk_info(
+                    &owner_info,
+                    is_json,
+                    is_simple,
+                    &format!("{}  ", prefix),
+                );
+                if !is_simple {
+                    to_stdout!("");
+                }
+            }
+        }
     }
 }
 
+fn is_match(blk: &str, info: &BlkInfo) -> bool {
+    if info.wwid == blk {
+        return true;
+    }
+    if let Some(ref m) = info.mount_point {
+        if m == blk {
+            return true;
+        }
+    }
+    false
+}
+
+fn get_blk_info(blk: &str) -> Option<BlkInfo> {
+    if blk.starts_with("/dev") {
+        match BlkInfo::new(blk) {
+            Ok(i) => return Some(i),
+            Err(e) => quit_with_msg(&format!("{}", e)),
+        };
+    } else {
+        // We might got wwid or other stuff
+        match BlkInfo::list() {
+            Ok(infos) => {
+                for info in infos {
+                    if is_match(blk, &info) {
+                        return Some(info);
+                    }
+                    for owner_info in &info.owners {
+                        if is_match(blk, &owner_info) {
+                            return Some(info.clone());
+                        }
+                    }
+                }
+            }
+            Err(e) => quit_with_msg(&format!("{}", e)),
+        };
+    }
+    quit_with_msg(&format!("Specified block not found"));
+    None
+}
+
 fn handle_info(blk: &str, is_json: bool) {
-    match BlkInfo::new(blk) {
-        Ok(i) => to_stdout_blk_info(i, is_json),
-        Err(e) => quit_with_msg(&format!("{}", e)),
-    };
+    if let Some(i) = get_blk_info(blk) {
+        to_stdout_blk_info(&i, is_json, false, "");
+    }
 }
 
 #[allow(unused_must_use)]
-fn handle_list(is_json: bool) {
+fn handle_list(is_json: bool, is_simple: bool) {
     match BlkInfo::list() {
         Ok(blk_infos) => {
             for blk_info in blk_infos {
-                to_stdout_blk_info(blk_info, is_json);
-                to_stdout!("\n");
+                to_stdout_blk_info(&blk_info, is_json, is_simple, "");
+                to_stdout!("");
             }
         }
         Err(e) => {
@@ -493,6 +568,7 @@ fn main() {
         .subcommand(
             SubCommand::with_name("list")
                 .about("List current blocks")
+                .arg(Arg::from_usage("-D 'Detailed output'"))
                 .arg(&json_arg),
         )
         .get_matches();
@@ -525,8 +601,12 @@ fn main() {
     }
 
     if let Some(matches) = matches.subcommand_matches("list") {
+        if matches.is_present("J") && matches.is_present("D") {
+            quit_with_msg("Argument 'D' conflict with 'J'");
+        }
         let is_json = matches.is_present("J");
-        handle_list(is_json);
+        let is_simple = !matches.is_present("D");
+        handle_list(is_json, is_simple);
         exit(0);
     }
 }

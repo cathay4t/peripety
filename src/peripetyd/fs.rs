@@ -8,8 +8,8 @@ fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {
     let mut event = event.clone();
     match BlkInfo::new(&event.kdev) {
         Ok(blk_info) => {
-            let uuid = match blk_info.uuid {
-                Some(u) => u,
+            let uuid = match &blk_info.uuid {
+                Some(u) => u.clone(),
                 None => {
                     println!(
                         "fs_parser: Failed to find uuid of block {}",
@@ -23,18 +23,13 @@ fn parse_event(event: &StorageEvent, sender: &Sender<StorageEvent>) {
                 event.raw_msg, blk_info.wwid, blk_info.blk_path,
             );
 
-            if let Some(mnt_pnt) = blk_info.mount_point {
+            if let Some(ref mnt_pnt) = blk_info.mount_point {
                 event
                     .extension
                     .insert("mount_point".to_string(), mnt_pnt.clone());
             }
-            event.dev_path = blk_info.blk_path.clone();
-            event.owners_wwids = blk_info.owners_wwids;
-            event.owners_paths = blk_info.owners_paths;
-            event.owners_wwids.insert(0, blk_info.wwid);
-            event.owners_paths.insert(0, blk_info.blk_path);
+            event.blk_info = blk_info;
             event.extension.insert("uuid".to_string(), uuid.clone());
-            event.dev_wwid = uuid;
 
             if event.sub_system == StorageSubSystem::FsExt4
                 && event.event_type == "FS_MOUNTED"

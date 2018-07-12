@@ -22,7 +22,6 @@ use conf::ConfMain;
 use data::{EventType, ParserInfo};
 use libc::{c_char, size_t};
 use peripety::{BlkInfo, LogSeverity, StorageEvent, StorageSubSystem};
-use std::collections::HashMap;
 use std::ffi::CStr;
 use std::io::{self, Write};
 use std::mem;
@@ -41,14 +40,17 @@ fn send_to_journald(event: &StorageEvent) {
     if !event.msg.is_empty() {
         logs.push(("MESSAGE".to_string(), event.msg.clone()));
     }
-    logs.push(("DEV_WWID".to_string(), event.dev_wwid.clone()));
-    logs.push(("DEV_PATH".to_string(), event.dev_path.clone()));
-    for owners_wwid in &event.owners_wwids {
-        logs.push(("OWNERS_WWIDS".to_string(), owners_wwid.clone()));
+    let blk_info = &event.blk_info;
+    logs.push(("DEV_WWID".to_string(), blk_info.wwid.clone()));
+    logs.push(("DEV_PATH".to_string(), blk_info.blk_path.clone()));
+    for owner_blk_info in &blk_info.owners {
+        logs.push(("OWNERS_WWIDS".to_string(), owner_blk_info.wwid.clone()));
+        logs.push((
+            "OWNERS_PATHS".to_string(),
+            owner_blk_info.blk_path.clone(),
+        ));
     }
-    for owners_path in &event.owners_paths {
-        logs.push(("OWNERS_PATHS".to_string(), owners_path.clone()));
-    }
+
     for (key, value) in &event.extension {
         logs.push((format!("EXT_{}", key.to_uppercase()), value.clone()));
     }
@@ -324,30 +326,26 @@ fn dump_blk_infos(notifier_send: &Sender<StorageEvent>) {
     let blk_infos = BlkInfo::list().expect("Failed to query existing blocks");
     for blk_info in blk_infos {
         let msg = match blk_info.mount_point {
-            Some(mount_point) => format!(
+            Some(ref mount_point) => format!(
                 "Found block '{}' mounted at '{}'",
                 &blk_info.blk_path, &mount_point
             ),
             None => format!("Found block '{}'", &blk_info.blk_path),
         };
+        let mut se: StorageEvent = Default::default();
+        se.hostname = gethostname();
+        se.severity = LogSeverity::Info;
+        se.sub_system = StorageSubSystem::Peripety;
+        se.timestamp =
+            Local::now().to_rfc3339_opts(SecondsFormat::Micros, false);
+        se.event_id = Uuid::new_v4().hyphenated().to_string();
+        se.event_type = "PERIPETY_BLK_INFO".to_string();
+        se.blk_info = blk_info;
+        se.msg = msg.clone();
+        se.raw_msg = msg;
+
         notifier_send
-            .send(StorageEvent {
-                hostname: gethostname(),
-                severity: LogSeverity::Info,
-                sub_system: StorageSubSystem::Other,
-                timestamp: Local::now()
-                    .to_rfc3339_opts(SecondsFormat::Micros, false),
-                event_id: Uuid::new_v4().hyphenated().to_string(),
-                event_type: "PERIPETY_BLK_INFO".to_string(),
-                dev_wwid: blk_info.wwid,
-                dev_path: blk_info.blk_path,
-                owners_wwids: blk_info.owners_wwids,
-                owners_paths: blk_info.owners_paths,
-                kdev: "".to_string(),
-                msg: msg.clone(),
-                raw_msg: msg,
-                extension: HashMap::new(),
-            })
+            .send(se)
             .expect("Failed to send block information event");
     }
 }

@@ -1,4 +1,3 @@
- * Replace getmntent() with getmntent_r();
  * Find a way to live in initramfs.
  * User case trigger file system event on block predict error.
  * Move `prpt` funtions to API.

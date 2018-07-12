@@ -11,8 +11,10 @@ use std::fs;
 use std::io::Read;
 use std::path::Path;
 
-#[derive(Clone, PartialEq, Debug, Serialize)]
+#[derive(Clone, PartialEq, Debug, Serialize, Deserialize)]
 pub enum BlkType {
+    Unknown,
+    Other,
     Scsi,
     Dm,
     DmMultipath,
@@ -23,6 +25,8 @@ pub enum BlkType {
 impl fmt::Display for BlkType {
     fn fmt(&self, fmt: &mut fmt::Formatter) -> fmt::Result {
         match *self {
+            BlkType::Unknown => write!(fmt, "Unknown"),
+            BlkType::Other => write!(fmt, "Other"),
             BlkType::Scsi => write!(fmt, "SCSI"),
             BlkType::Dm => write!(fmt, "Device Mapper"),
             BlkType::DmMultipath => write!(fmt, "Device Mapper Multipath"),
@@ -32,19 +36,40 @@ impl fmt::Display for BlkType {
     }
 }
 
-#[derive(Debug, Serialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BlkInfo {
     pub wwid: String,
     pub blk_type: BlkType,
     pub blk_path: String,
     pub preferred_blk_path: String, // preferred block path
-    pub owners_wwids: Vec<String>,
-    pub owners_types: Vec<BlkType>,
-    pub owners_paths: Vec<String>,
-    pub owners_transport_ids: Vec<String>,
     pub uuid: Option<String>,
     pub mount_point: Option<String>,
     pub transport_id: String,
+    pub owners: Vec<BlkInfo>,
+}
+
+impl Default for BlkInfo {
+    fn default() -> BlkInfo {
+        BlkInfo {
+            wwid: String::new(),
+            blk_type: BlkType::Unknown,
+            blk_path: String::new(),
+            preferred_blk_path: String::new(),
+            uuid: None,
+            mount_point: None,
+            transport_id: String::new(),
+            owners: Vec::new(),
+        }
+    }
+}
+
+fn flat_blk_info_owners(owners: Vec<BlkInfo>) -> Vec<BlkInfo> {
+    let mut ret = Vec::new();
+    for owner in owners {
+        ret.push(owner.clone());
+        ret.append(&mut flat_blk_info_owners(owner.owners));
+    }
+    ret
 }
 
 impl BlkInfo {
@@ -59,6 +84,10 @@ impl BlkInfo {
         if bi.uuid.is_some() {
             bi.mount_point = BlkInfo::get_mount_point(&bi.blk_path);
         }
+
+        // flat the owners array.
+        bi.owners = flat_blk_info_owners(bi.owners);
+
         Ok(bi)
     }
 
@@ -98,10 +127,10 @@ impl BlkInfo {
         for dm_dev in &dm_devs {
             let info = BlkInfo::new(&dm_dev)?;
             if info.blk_type == BlkType::DmMultipath {
-                for owner in info.owners_paths {
-                    let blk_name = match owner.rfind('/') {
-                        Some(i) => &owner[i + 1..],
-                        None => owner.as_str(),
+                for owner_info in info.owners {
+                    let blk_name = match owner_info.blk_path.rfind('/') {
+                        Some(i) => &owner_info.blk_path[i + 1..],
+                        None => owner_info.blk_path.as_str(),
                     };
                     other_devs.retain(|x| x != blk_name);
                 }
