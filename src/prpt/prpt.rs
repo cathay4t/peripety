@@ -30,6 +30,7 @@ extern crate chrono;
 #[macro_use]
 extern crate clap;
 extern crate libc;
+extern crate libnotify;
 extern crate nix;
 extern crate peripety;
 extern crate sdjournal;
@@ -65,6 +66,7 @@ struct CliOpt {
     since: Option<u64>,
     blk_info: Option<BlkInfo>,
     is_json: bool,
+    need_notify: bool,
 }
 
 arg_enum!{
@@ -133,6 +135,7 @@ fn arg_match_to_cliopt(matches: &ArgMatches) -> CliOpt {
         since: None,
         blk_info: None,
         is_json: false,
+        need_notify: false,
     };
     if matches.is_present("severity") {
         match matches.value_of("severity") {
@@ -188,6 +191,7 @@ fn arg_match_to_cliopt(matches: &ArgMatches) -> CliOpt {
     }
 
     ret.is_json = matches.is_present("J");
+    ret.need_notify = matches.is_present("N");
 
     if matches.is_present("blk") {
         match matches.value_of("blk") {
@@ -236,6 +240,11 @@ fn handle_event(event: &StorageEvent, cli_opt: &CliOpt) {
     }
 
     if is_match {
+        let msg = if !event.msg.is_empty() {
+            &event.msg
+        } else {
+            &event.raw_msg
+        };
         if cli_opt.is_json {
             to_stdout!(
                 "{}\n",
@@ -248,18 +257,28 @@ fn handle_event(event: &StorageEvent, cli_opt: &CliOpt) {
                 .expect("BUG: DateTime::parse_from_rfc3339()")
                 .with_timezone(&Local)
                 .to_rfc2822();
-            let msg = if !event.msg.is_empty() {
-                &event.msg
-            } else {
-                &event.raw_msg
-            };
             to_stdout!(
                 "{} {} {} {}",
                 ts,
                 event.hostname,
                 event.sub_system,
-                msg
+                &msg
             );
+        }
+        if cli_opt.need_notify {
+            let n = libnotify::Notification::new(
+                &format!(
+                    "{:?} {} {}",
+                    event.severity,
+                    event.sub_system,
+                    event.event_type
+                ),
+                Some(msg.as_str()),
+                None,
+            );
+            if let Err(e) = n.show() {
+                to_stderr!("Failed to send notification: {}", e);
+            }
         }
     }
     ()
@@ -295,6 +314,10 @@ fn handle_monitor(cli_opt: &CliOpt) {
         }
         if !fds.contains(journal.as_raw_fd()) {
             continue;
+        }
+        if cli_opt.need_notify {
+            libnotify::init("peripety")
+                .expect("Failed to initialize libnotify");
         }
         for entry in &mut journal {
             match entry {
@@ -537,7 +560,8 @@ fn main() {
                 .arg(&sev_arg)
                 .arg(&evt_arg)
                 .arg(&sub_arg)
-                .arg(&blk_arg),
+                .arg(&blk_arg)
+                .arg(Arg::from_usage("-N 'Notify via dbus'")),
         )
         .subcommand(
             SubCommand::with_name("query")
