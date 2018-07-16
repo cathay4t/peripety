@@ -46,14 +46,14 @@ use std::process::exit;
 
 macro_rules! to_stdout {
     ($($arg:tt)*) => (
-        if let Err(_) = writeln!(&mut io::stdout(), $($arg)*) {
+        if writeln!(&mut io::stdout(), $($arg)*).is_err() {
             exit(0);
         });
 }
 
 macro_rules! to_stderr {
     ($($arg:tt)*) => (
-        if let Err(_) = writeln!(&mut io::stderr(), $($arg)*) {
+        if writeln!(&mut io::stderr(), $($arg)*).is_err() {
             exit(0);
         });
 }
@@ -184,7 +184,7 @@ fn arg_match_to_cliopt(matches: &ArgMatches) -> CliOpt {
                 Some(t) => {
                     ret.since = Some(t);
                 }
-                None => quit_with_msg(&format!("Invalid --since option")),
+                None => quit_with_msg("Invalid --since option"),
             },
             None => quit_with_msg("Invalid since"),
         }
@@ -269,9 +269,7 @@ fn handle_event(event: &StorageEvent, cli_opt: &CliOpt) {
             let n = libnotify::Notification::new(
                 &format!(
                     "{:?} {} {}",
-                    event.severity,
-                    event.sub_system,
-                    event.event_type
+                    event.severity, event.sub_system, event.event_type
                 ),
                 Some(msg.as_str()),
                 None,
@@ -347,9 +345,9 @@ fn handle_query(cli_opt: &CliOpt) {
         .expect("Unable to search peripety journal");
 
     if let Some(since) = cli_opt.since {
-        journal
-            .seek_realtime_usec(since)
-            .expect(&format!("Unable to seek journal after {}", since));
+        journal.seek_realtime_usec(since).unwrap_or_else(|_| {
+            panic!("Unable to seek journal after {}", since)
+        })
     }
     for entry in &mut journal {
         match entry {
@@ -473,7 +471,7 @@ fn get_blk_info(blk: &str) -> Option<BlkInfo> {
             Err(e) => quit_with_msg(&format!("{}", e)),
         };
     }
-    quit_with_msg(&format!("Specified block not found"));
+    quit_with_msg("Specified block not found");
     None
 }
 

@@ -38,10 +38,9 @@ impl<'a> RegexConfStr<'a> {
     pub fn to_regex_conf(&self) -> RegexConf {
         RegexConf {
             starts_with: self.starts_with.map(|s| s.to_string()),
-            regex: Regex::new(self.regex).expect(&format!(
-                "BUG: data.rs has invalid regex: {}",
-                self.regex
-            )),
+            regex: Regex::new(self.regex).unwrap_or_else(|_| {
+                panic!("BUG: data.rs has invalid regex: {}", self.regex)
+            }),
             // ^ We panic when hard-coded regex is not valid. It's developer's
             // fault.
             sub_system: self.sub_system

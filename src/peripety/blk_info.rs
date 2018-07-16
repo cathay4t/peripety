@@ -323,7 +323,7 @@ impl BlkInfo {
                         m.mount_point.into_owned().to_str()
                     {
                         if mount_source == blk_path {
-                            return Some(format!("{}", mount_point));
+                            return Some(mount_point.to_string());
                         }
                     }
                 }

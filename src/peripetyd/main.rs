@@ -193,7 +193,7 @@ fn main() {
         libc::sigprocmask(libc::SIG_BLOCK, &mask, ptr::null_mut());
         libc::signalfd(
             -1, /* create new fd */
-            &mut mask,
+            &mask,
             0, /* no flag */
         )
     };

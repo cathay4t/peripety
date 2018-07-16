@@ -220,11 +220,11 @@ fn iscsi_session_id_of_host(host_id: &str) -> Result<String, PeripetyError> {
             }
         }
     }
-    return Err(PeripetyError::InternalBug(format!(
+    Err(PeripetyError::InternalBug(format!(
         "iscsi_session_id_of_host: Failed to find session id of \
          host {}",
         host_id
-    )));
+    )))
 }
 
 fn get_iscsi_info(
