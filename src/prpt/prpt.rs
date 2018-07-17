@@ -30,7 +30,10 @@ extern crate chrono;
 #[macro_use]
 extern crate clap;
 extern crate libc;
+
+#[cfg(feature = "notify")]
 extern crate libnotify;
+
 extern crate nix;
 extern crate peripety;
 extern crate sdjournal;
@@ -265,18 +268,8 @@ fn handle_event(event: &StorageEvent, cli_opt: &CliOpt) {
                 &msg
             );
         }
-        if cli_opt.need_notify {
-            let n = libnotify::Notification::new(
-                &format!(
-                    "{:?} {} {}",
-                    event.severity, event.sub_system, event.event_type
-                ),
-                Some(msg.as_str()),
-                None,
-            );
-            if let Err(e) = n.show() {
-                to_stderr!("Failed to send notification: {}", e);
-            }
+        if cli_opt.need_notify && cfg!(feature = "notify") {
+            send_libnotify(event)
         }
     }
     ()
@@ -314,8 +307,7 @@ fn handle_monitor(cli_opt: &CliOpt) {
             continue;
         }
         if cli_opt.need_notify {
-            libnotify::init("peripety")
-                .expect("Failed to initialize libnotify");
+            init_libnotify();
         }
         for entry in &mut journal {
             match entry {
@@ -545,22 +537,33 @@ fn main() {
 
     let no_permission_arg = Arg::from_usage("-f 'Skip permission check'");
 
+    let monitor_sub_cmd = if cfg!(feature = "notify") {
+        SubCommand::with_name("monitor")
+            .about("Monitor following up events")
+            .arg(&no_permission_arg)
+            .arg(&json_arg)
+            .arg(&sev_arg)
+            .arg(&evt_arg)
+            .arg(&sub_arg)
+            .arg(&blk_arg)
+            .arg(Arg::from_usage("-N 'Notify via dbus'"))
+    } else {
+        SubCommand::with_name("monitor")
+            .about("Monitor following up events")
+            .arg(&no_permission_arg)
+            .arg(&json_arg)
+            .arg(&sev_arg)
+            .arg(&evt_arg)
+            .arg(&sub_arg)
+            .arg(&blk_arg)
+    };
+
     let matches = App::new("Peripety CLI")
         .version("0.1")
         .author("Gris Ge <fge@redhat.com>")
         .about("CLI utile for peripety events")
         .setting(AppSettings::SubcommandRequiredElseHelp)
-        .subcommand(
-            SubCommand::with_name("monitor")
-                .about("Monitor following up events")
-                .arg(&no_permission_arg)
-                .arg(&json_arg)
-                .arg(&sev_arg)
-                .arg(&evt_arg)
-                .arg(&sub_arg)
-                .arg(&blk_arg)
-                .arg(Arg::from_usage("-N 'Notify via dbus'")),
-        )
+        .subcommand(monitor_sub_cmd)
         .subcommand(
             SubCommand::with_name("query")
                 .about("Query saved events")
@@ -632,3 +635,34 @@ fn main() {
         exit(0);
     }
 }
+
+#[cfg(feature = "notify")]
+fn send_libnotify(event: &StorageEvent) {
+    let msg = if !event.msg.is_empty() {
+        &event.msg
+    } else {
+        &event.raw_msg
+    };
+    let n = libnotify::Notification::new(
+        &format!(
+            "{:?} {} {}",
+            event.severity, event.sub_system, event.event_type
+        ),
+        Some(msg.as_str()),
+        None,
+    );
+    if let Err(e) = n.show() {
+        to_stderr!("Failed to send notification: {}", e);
+    }
+}
+
+#[cfg(not(feature = "notify"))]
+fn send_libnotify(_event: &StorageEvent) {}
+
+#[cfg(feature = "notify")]
+fn init_libnotify() {
+    libnotify::init("peripety").expect("Failed to initialize libnotify");
+}
+
+#[cfg(not(feature = "notify"))]
+fn init_libnotify() {}

@@ -7,6 +7,11 @@ authors = ["Gris Ge <fge@redhat.com>"]
 name = "prpt"
 path = "prpt.rs"
 
+
+[features]
+default = []
+notify = ["libnotify"]
+
 [dependencies]
 peripety = { path = "../peripety", version = "*"}
 sdjournal = { path = "../sdjournal", version = "*"}
@@ -14,4 +19,4 @@ nix = ">=0.10"
 clap = "^2.31"
 chrono = ">=0.4"
 libc = ">=0.2"
-libnotify = ">=1.0"
+libnotify = { version = ">=1.0", optional = true }
