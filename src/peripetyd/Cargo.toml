@@ -12,8 +12,8 @@ peripety = { path = "../peripety", version = "*"}
 sdjournal = { path = "../sdjournal", version = "*"}
 nix = ">=0.10"
 regex = ">=0.2"
-serde = "^1.0"
-serde_derive = "^1.0"
+serde = ">=1.0"
+serde_derive = ">=1.0"
 toml = ">=0.4"
 chrono = ">=0.4"
 libc = ">=0.2"

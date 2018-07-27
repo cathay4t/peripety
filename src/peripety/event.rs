@@ -1,10 +1,15 @@
 use super::blk_info::BlkInfo;
 use super::error::PeripetyError;
+use super::filter::{StorageEventFilter, StorageEventFilterType};
 
 use serde_json;
 use std::collections::HashMap;
 use std::fmt;
 use std::str::{self, FromStr};
+use chrono::{Local, Datelike, TimeZone, Duration};
+use sdjournal::Journal;
+
+//TODO(Gris Ge): Add function StorageEvent::save_to_journal()
 
 #[repr(u8)]
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, PartialOrd)]
@@ -171,4 +176,149 @@ impl StorageEvent {
             }
         }
     }
+
+    pub fn query(
+        filters: Option<&[StorageEventFilter]>,
+    ) -> Result<StorageEventIter, PeripetyError> {
+        let mut ret = StorageEventIter::new()?;
+        if let Some(fts) = filters {
+            ret.apply_filters(fts)?;
+        }
+        ret.journal.seek_head()?;
+        Ok(ret)
+    }
+
+    pub fn monitor(
+        filters: Option<&[StorageEventFilter]>,
+    ) -> Result<StorageEventIter, PeripetyError> {
+        let mut ret = StorageEventIter::new()?;
+        if let Some(fts) = filters {
+            ret.apply_filters(fts)?;
+        }
+        ret.journal.seek_tail()?;
+        Ok(ret)
+    }
+}
+
+pub struct StorageEventIter {
+    journal: Journal,
+    extra_filters: Vec<StorageEventFilter>,
+}
+
+impl Iterator for StorageEventIter {
+    type Item = Result<StorageEvent, PeripetyError>;
+
+    fn next(&mut self) -> Option<Result<StorageEvent, PeripetyError>> {
+        loop {
+            match self.journal.next() {
+                Some(Ok(entry)) => {
+                    if let Some(j) = entry.get("JSON") {
+                        if let Ok(event) = StorageEvent::from_json_string(j) {
+                            return Some(Ok(event));
+                        }
+                    }
+                }
+                Some(Err(e)) => return Some(Err(PeripetyError::from(e))),
+                None => return None,
+            }
+        }
+    }
+}
+
+impl StorageEventIter {
+    fn new() -> Result<StorageEventIter, PeripetyError> {
+        let mut journal = Journal::new()?;
+        journal.timeout_us = 0;
+        journal.add_match("IS_PERIPETY=TRUE")?;
+        Ok(StorageEventIter {
+            journal: journal,
+            extra_filters: Vec::new(),
+        })
+    }
+
+    fn apply_filters(
+        &mut self,
+        filters: &[StorageEventFilter],
+    ) -> Result<(), PeripetyError> {
+        for filter in filters {
+            self.apply_filter(filter)?;
+        }
+        Ok(())
+    }
+
+    fn apply_filter(
+        &mut self,
+        filter: &StorageEventFilter,
+    ) -> Result<(), PeripetyError> {
+        // The sd_journal_add_match() only fail when no memory or running in
+        // fork() (running in fork() is not supported by journald.
+        // If the journal is running in fork(), we already get error from
+        // PeripetySession::new().
+        let filter_type = filter.filter_type.clone();
+        let value = &filter.value;
+        match filter.filter_type {
+            StorageEventFilterType::Wwid => {
+                self.extra_filters.push(StorageEventFilter{
+                    filter_type: filter_type,
+                    value: value.to_string(),
+                })
+            }
+            StorageEventFilterType::EventType => {
+                self.journal.add_match(&format!("EVENT_TYPE={}", value))?
+            }
+            StorageEventFilterType::Severity => {
+                self.extra_filters.push(StorageEventFilter{
+                    filter_type: filter_type,
+                    value: value.to_string(),
+                })
+            }
+            StorageEventFilterType::SubSystem => {
+                self.journal.add_match(&format!("SUB_SYSTEM={}", value))?
+            }
+            StorageEventFilterType::Since => self.journal
+                .seek_realtime_usec(since_str_to_jourald_timestamp(&value)?)?,
+            StorageEventFilterType::EventId => {
+                self.journal.add_match(&format!("EVENT_ID={}", value))?
+            }
+        }
+        Ok(())
+    }
+}
+
+fn time_str_to_u64(time_str: &str) -> Result<u64, PeripetyError> {
+    if let Ok(t) = Local.datetime_from_str(time_str, "%F %H:%M:%S") {
+        return Ok(t.timestamp() as u64 * 10u64.pow(6)
+            + u64::from(t.timestamp_subsec_micros()));
+    }
+    Err(PeripetyError::InvalidArgument(
+        "Invalid format of since time string".to_string(),
+    ))
+}
+
+fn since_str_to_jourald_timestamp(since: &str) -> Result<u64, PeripetyError> {
+    if since.to_uppercase() == "TODAY" {
+        let dt = Local::now();
+        return time_str_to_u64(&format!(
+            "{}-{}-{} 00:00:00",
+            dt.year(),
+            dt.month(),
+            dt.day()
+        ));
+    }
+
+    if since.to_uppercase() == "YESTERDAY" {
+        let dt = Local::now() - Duration::days(1);
+        return time_str_to_u64(&format!(
+            "{}-{}-{} 00:00:00",
+            dt.year(),
+            dt.month(),
+            dt.day()
+        ));
+    }
+
+    if since.contains(':') {
+        return time_str_to_u64(since);
+    }
+
+    time_str_to_u64(&format!("{} 00:00:00", since))
 }

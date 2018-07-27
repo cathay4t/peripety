@@ -30,13 +30,13 @@ extern crate chrono;
 #[macro_use]
 extern crate clap;
 extern crate libc;
+extern crate sdjournal;
 
 #[cfg(feature = "notify")]
 extern crate libnotify;
 
 extern crate nix;
 extern crate peripety;
-extern crate sdjournal;
 
 use chrono::{DateTime, Datelike, Duration, Local, TimeZone};
 use clap::{App, AppSettings, Arg, ArgMatches, SubCommand};
@@ -328,33 +328,17 @@ fn handle_monitor(cli_opt: &CliOpt) {
 }
 
 fn handle_query(cli_opt: &CliOpt) {
-    let mut journal =
-        sdjournal::Journal::new().expect("Failed to open systemd journal");
-    // We never want to block, so set the timeout to 0
-    journal.timeout_us = 0;
-    journal
-        .add_match("IS_PERIPETY=TRUE")
-        .expect("Unable to search peripety journal");
-
-    if let Some(since) = cli_opt.since {
-        journal.seek_realtime_usec(since).unwrap_or_else(|_| {
-            panic!("Unable to seek journal after {}", since)
-        })
-    }
-    for entry in &mut journal {
-        match entry {
-            Ok(entry) => {
-                if let Some(j) = entry.get("JSON") {
-                    match StorageEvent::from_json_string(j) {
-                        Ok(event) => handle_event(&event, &cli_opt),
-                        Err(e) => quit_with_msg(&format!("Error: {}", e)),
-                    };
+    match StorageEvent::query(None) {
+        Ok(event_iter) => {
+            for entry in event_iter {
+                match entry {
+                    Ok(event) => handle_event(&event, &cli_opt),
+                    Err(e) => quit_with_msg(&format!("{}", e)),
                 }
             }
-            Err(e) => quit_with_msg(&format!(
-                "Error retrieving the journal entry: {:?}",
-                e
-            )),
+        }
+        Err(e) => {
+            quit_with_msg(&format!("Error retrieving the storage event: {}", e))
         }
     }
 }

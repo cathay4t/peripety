@@ -33,10 +33,13 @@ extern crate libc;
 extern crate libmount;
 extern crate regex;
 extern crate serde_json;
+extern crate sdjournal;
+extern crate chrono;
 
 pub use self::blk_info::{BlkInfo, BlkType};
 pub use self::error::PeripetyError;
-pub use self::event::{LogSeverity, StorageEvent, StorageSubSystem};
+pub use self::event::{LogSeverity, StorageEvent, StorageSubSystem, StorageEventIter};
+pub use self::filter::{StorageEventFilter};
 
 mod blk_info;
 mod dm;
@@ -44,3 +47,4 @@ mod error;
 mod event;
 mod scsi;
 mod sysfs;
+mod filter;

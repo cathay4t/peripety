@@ -128,6 +128,7 @@ extern "C" {
     fn sd_journal_close(j: *mut SdJournal);
     fn sd_journal_wait(j: *mut SdJournal, timeout_usec: u64) -> c_int;
     fn sd_journal_seek_tail(j: *mut SdJournal) -> c_int;
+    fn sd_journal_seek_head(j: *mut SdJournal) -> c_int;
     fn sd_journal_previous_skip(j: *mut SdJournal, skip: u64) -> c_int;
 
     fn sd_journal_sendv(iovs: *const libc::iovec, n: c_int) -> c_int;
@@ -330,6 +331,17 @@ impl Journal {
         if rc < 0 {
             return Err(SdJournalError::CError(ClibraryError::new(
                 String::from("Error on sd_journal_previous_skip"),
+                rc,
+            )));
+        }
+        Ok(())
+    }
+
+    pub fn seek_head(&mut self) -> Result<(), SdJournalError> {
+        let rc = unsafe { sd_journal_seek_head(self.handle) };
+        if rc < 0 {
+            return Err(SdJournalError::CError(ClibraryError::new(
+                String::from("Error on sd_journal_seek_head"),
                 rc,
             )));
         }
