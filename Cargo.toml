@@ -1,7 +1,6 @@
 [workspace]
 members = [
     "src/peripetyd",
-    "src/sdjournal",
     "src/peripety",
     "src/prpt",
 ]
