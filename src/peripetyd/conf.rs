@@ -6,24 +6,24 @@ use std::io::Read;
 use std::path::Path;
 use toml;
 
+use std::io::Write;
+
 static CONFIG_PATH: &'static str = "/etc/peripetyd.conf";
 
 #[derive(Deserialize, Debug)]
 pub struct ConfMain {
-    pub notify_stdout: Option<bool>,
     pub save_to_journald: Option<bool>,
-    pub dump_blk_info_at_start: Option<bool>,
 }
 
 #[derive(Deserialize, Debug)]
-pub struct ConfCollectorRegex {
+pub struct ConfRegex {
     pub regex: String,
     pub event_type: String,
     pub starts_with: Option<String>,
     pub sub_system: String,
 }
 
-impl ConfCollectorRegex {
+impl ConfRegex {
     pub fn to_regex_conf(&self) -> Result<RegexConf, PeripetyError> {
         let regex = match Regex::new(&self.regex) {
             Ok(r) => r,
@@ -53,40 +53,43 @@ impl ConfCollectorRegex {
 }
 
 #[derive(Deserialize, Debug)]
-pub struct ConfCollector {
-    pub regexs: Vec<ConfCollectorRegex>,
-}
-
-#[derive(Deserialize, Debug)]
-pub struct Conf {
+pub struct PeripetyConf {
     pub main: ConfMain,
-    pub collector: ConfCollector,
+    pub regexs: Vec<ConfRegex>,
 }
 
-pub fn load_conf() -> Option<Conf> {
+pub fn load_conf() -> Option<PeripetyConf> {
     let path = Path::new(CONFIG_PATH);
     if !path.exists() {
-        println!("Config file {} does not exist", CONFIG_PATH);
+        to_stderr!("Config file {} does not exist", CONFIG_PATH);
         return None;
     }
 
     let mut fd = match File::open(path) {
         Ok(fd) => fd,
         Err(e) => {
-            println!("Failed to open config file {}, error {}", CONFIG_PATH, e);
+            to_stderr!(
+                "Failed to open config file {}, error {}",
+                CONFIG_PATH,
+                e
+            );
             return None;
         }
     };
     let mut contents = String::new();
     if let Err(e) = fd.read_to_string(&mut contents) {
-        println!("Fail to read config file {}, error {}", CONFIG_PATH, e);
+        to_stderr!("Fail to read config file {}, error {}", CONFIG_PATH, e);
         return None;
     }
 
     match toml::from_str(&contents) {
         Ok(c) => Some(c),
         Err(e) => {
-            println!("Fail to parse config file {}, error {}", CONFIG_PATH, e);
+            to_stderr!(
+                "Fail to parse config file {}, error {}",
+                CONFIG_PATH,
+                e
+            );
             None
         }
     }

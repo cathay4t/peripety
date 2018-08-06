@@ -1,351 +1,236 @@
-extern crate nix;
 extern crate peripety;
 extern crate regex;
-extern crate sdjournal;
+extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
-extern crate chrono;
-extern crate libc;
 extern crate toml;
-extern crate uuid;
 
+#[macro_use]
+mod misc;
 mod buildin_regex;
-mod collector;
 mod conf;
 mod data;
-mod fs;
-mod mpath;
-mod scsi;
+//mod fs;
+//mod mpath;
+//mod scsi;
 
-use chrono::{Local, SecondsFormat};
-use conf::ConfMain;
-use data::{EventType, ParserInfo};
-use libc::{c_char, size_t};
-use peripety::{BlkInfo, LogSeverity, StorageEvent, StorageSubSystem};
-use std::ffi::CStr;
-use std::io::{self, Write};
-use std::mem;
-use std::process::exit;
-use std::ptr;
-use std::sync::mpsc;
-use std::sync::mpsc::{Receiver, Sender};
-use std::thread::{sleep, Builder};
-use std::time::Duration;
-use uuid::Uuid;
-
-fn send_to_journald(event: &StorageEvent) {
-    let mut logs = Vec::new();
-    logs.push(("IS_PERIPETY".to_string(), "TRUE".to_string()));
-    logs.push(("PRIORITY".to_string(), format!("{}", event.severity as u8)));
-    if !event.msg.is_empty() {
-        logs.push(("MESSAGE".to_string(), event.msg.clone()));
-    }
-    let blk_info = &event.blk_info;
-    logs.push(("DEV_WWID".to_string(), blk_info.wwid.clone()));
-    logs.push(("DEV_PATH".to_string(), blk_info.blk_path.clone()));
-    for owner_blk_info in &blk_info.owners {
-        logs.push(("OWNERS_WWIDS".to_string(), owner_blk_info.wwid.clone()));
-        logs.push((
-            "OWNERS_PATHS".to_string(),
-            owner_blk_info.blk_path.clone(),
-        ));
-    }
-
-    for (key, value) in &event.extension {
-        logs.push((format!("EXT_{}", key.to_uppercase()), value.clone()));
-    }
-    logs.push(("EVENT_TYPE".to_string(), event.event_type.clone()));
-    logs.push(("EVENT_ID".to_string(), event.event_id.clone()));
-    logs.push(("SUB_SYSTEM".to_string(), event.sub_system.to_string()));
-    logs.push((
-        "JSON".to_string(),
-        event.to_json_string().expect("BUG: event.to_json_string()"),
-    ));
-    if let Err(e) = sdjournal::send_journal_list(&logs) {
-        println!("Failed to save event to journald: {}", e);
-    }
-}
-
-fn handle_events_from_parsers(
-    recver: &Receiver<StorageEvent>,
-    parsers: &[ParserInfo],
-    daemon_conf_recv: &Receiver<ConfMain>,
-) {
-    let mut notify_stdout = false;
-    let mut save_to_journald = true;
-    loop {
-        if let Ok(conf) = daemon_conf_recv.try_recv() {
-            if let Some(v) = conf.notify_stdout {
-                notify_stdout = v;
-            } else {
-                // Use default value
-                notify_stdout = false;
-            }
-            if let Some(v) = conf.save_to_journald {
-                save_to_journald = v;
-            } else {
-                // Use default value
-                save_to_journald = true;
-            }
-        }
-
-        let event = match recver.recv() {
-            Ok(e) => e,
-            Err(e) => {
-                println!("Failed to receive event from parsers: {}", e);
-                continue;
-            }
-        };
-
-        // Send to stdout
-        if notify_stdout {
-            if let Ok(s) = event.to_json_string_pretty() {
-                let _ = writeln!(&mut io::stdout(), "{}", s);
-            }
-        }
-
-        // Send to journald.
-        // TODO(Gris Ge): Invoke a thread of this in case sdjournal slows us.
-        if save_to_journald {
-            send_to_journald(&event);
-        }
-
-        // Send to parser if parser require it.
-        for parser in parsers {
-            let required =
-                if parser.filter_event_type.contains(&EventType::Synthetic) {
-                    match parser.filter_event_subsys {
-                        None => true,
-                        Some(ref syss) => syss.contains(&event.sub_system),
-                    }
-                } else {
-                    false
-                };
-            if required {
-                if let Err(e) = parser.sender.send(event.clone()) {
-                    println!("Failed to send synthetic event to parser: {}", e);
-                }
-            }
-        }
-    }
-}
-
-fn collector_to_parsers(
-    collector_recv: &Receiver<StorageEvent>,
-    parsers: &[ParserInfo],
-) {
-    loop {
-        match collector_recv.recv() {
-            Ok(event) => {
-                // Send to parser if parser require it.
-                for parser in parsers {
-                    let required = if parser
-                        .filter_event_type
-                        .contains(&EventType::Raw)
-                    {
-                        match parser.filter_event_subsys {
-                            None => true,
-                            Some(ref syss) => syss.contains(&event.sub_system),
-                        }
-                    } else {
-                        false
-                    };
-                    if required {
-                        if let Err(e) = parser.sender.send(event.clone()) {
-                            println!(
-                                "Failed to send event to parser {}: {}",
-                                parser.name, e
-                            );
-                        }
-                    }
-                }
-            }
-            Err(e) => {
-                println!("Failed to retrieve event from collector: {}", e);
-                return;
-            }
-        }
-    }
-}
+use buildin_regex::BUILD_IN_REGEX_CONFS;
+use data::RegexConf;
+use peripety::{BlkInfo, StorageSubSystem};
+use serde_json::{Map, Value};
+use std::io::Write;
 
 fn main() {
-    let (collector_send, collector_recv) = mpsc::channel();
-    let (notifier_send, notifier_recv) = mpsc::channel();
-    let (conf_send, conf_recv) = mpsc::channel();
-    let (daemon_conf_send, daemon_conf_recv) = mpsc::channel();
-    let mut parsers: Vec<ParserInfo> = Vec::new();
-    let mut dump_blk_info = true;
+    let mut regex_confs: Vec<RegexConf> = Vec::new();
 
-    let mut daemon_conf = None;
-    let mut collector_conf = None;
     if let Some(c) = conf::load_conf() {
-        if c.main.dump_blk_info_at_start == Some(false) {
-            dump_blk_info = false;
-        }
-        daemon_conf = Some(c.main);
-        collector_conf = Some(c.collector);
-    }
-
-    let sig_fd = unsafe {
-        let mut mask: libc::sigset_t = mem::uninitialized();
-        libc::sigemptyset(&mut mask);
-        libc::sigaddset(&mut mask, libc::SIGHUP);
-        libc::sigprocmask(libc::SIG_BLOCK, &mask, ptr::null_mut());
-        libc::signalfd(
-            -1, /* create new fd */
-            &mask,
-            0, /* no flag */
-        )
-    };
-    if sig_fd < 0 {
-        println!("BUG: Failed to handle SIGHUP signal");
-        exit(1);
-    }
-
-    // 1. Start parser threads
-    parsers.push(mpath::parser_start(notifier_send.clone()));
-    parsers.push(scsi::parser_start(notifier_send.clone()));
-    parsers.push(fs::parser_start(notifier_send.clone()));
-
-    let parsers_clone = parsers.clone();
-
-    // 2. Start thread for forwarding collector output to parsers.
-    Builder::new()
-        .name("collector_to_parser".into())
-        .spawn(move || {
-            collector_to_parsers(&collector_recv, &parsers);
-        })
-        .expect("Failed to start 'collector_to_parser' thread");
-
-    // 3. Start thread for forwarding parsers output to parsers and notifier.
-    Builder::new()
-        .name("handle_events_from_parsers".into())
-        .spawn(move || {
-            handle_events_from_parsers(
-                &notifier_recv,
-                &parsers_clone,
-                &daemon_conf_recv,
-            );
-        })
-        .expect("Failed to start 'handle_events_from_parsers' thread");
-
-    // TODO(Gris Ge): Need better way for waiting threads to be ready.
-    sleep(Duration::from_secs(1));
-
-    // 4. Start collector thread
-    Builder::new()
-        .name("collector".into())
-        .spawn(move || {
-            collector::new(&collector_send, &conf_recv);
-        })
-        .expect("Failed to start 'collector' thread");
-
-    if let Some(c) = collector_conf {
-        conf_send
-            .send(c)
-            .expect("Failed to send config to collector");
-    }
-
-    if let Some(c) = daemon_conf {
-        daemon_conf_send
-            .send(c)
-            .expect("Failed to reload daemon config");
-    }
-
-    println!("Peripetyd: Ready!");
-
-    if dump_blk_info {
-        dump_blk_infos(&notifier_send);
-    }
-
-    let mut sig: libc::signalfd_siginfo = unsafe { mem::uninitialized() };
-    let sig_size = std::mem::size_of::<libc::signalfd_siginfo>();
-
-    loop {
-        let mut fds = nix::sys::select::FdSet::new();
-        fds.insert(sig_fd);
-        if let Err(e) =
-            nix::sys::select::select(None, Some(&mut fds), None, None, None)
-        {
-            println!("collector: Failed select against signal fd: {}", e);
-            continue;
-        }
-        if fds.contains(sig_fd) {
-            unsafe {
-                if libc::read(
-                    sig_fd,
-                    &mut sig as *mut _ as *mut libc::c_void,
-                    sig_size,
-                ) != sig_size as isize
-                    || sig.ssi_signo != libc::SIGHUP as u32
-                {
+        for regex_conf in c.regexs {
+            match regex_conf.to_regex_conf() {
+                Ok(r) => regex_confs.push(r),
+                Err(e) => {
+                    to_stderr!("Invalid regex configuration: {}", e);
                     continue;
                 }
             }
         }
+    }
 
-        if let Some(c) = conf::load_conf() {
-            println!("Config reloaded");
-            if let Err(e) = conf_send.send(c.collector) {
-                println!("failed to send config to collector: {}", e);
-                continue;
+    for regex_conf_str in BUILD_IN_REGEX_CONFS {
+        regex_confs.push(regex_conf_str.to_regex_conf());
+    }
+
+    let fd = std::io::stdin();
+    let mut input = String::new();
+    loop {
+        input.clear();
+        match fd.read_line(&mut input) {
+            Ok(_) => {
+                let line = input.trim();
+                if line.is_empty() {
+                    continue;
+                }
+                if let Some(event_str) = parse_rsyslog_log(&line, &regex_confs)
+                {
+                    to_stdout!("{}", event_str);
+                } else {
+                    to_stdout!("{}", "{}".to_string());
+                    // ^ empty json means no filed is to be modified.
+                }
             }
-            if let Err(e) = daemon_conf_send.send(c.main) {
-                println!("Failed to reload daemon config: {}", e);
-                continue;
+            Err(error) => {
+                to_stderr!("Got error when reading from stdin: {}", error)
             }
         }
     }
 }
 
-const HOST_NAME_MAX: usize = 64;
-
-fn gethostname() -> String {
-    let mut buf = [0u8; HOST_NAME_MAX];
-    let rc = unsafe {
-        libc::gethostname(
-            buf.as_mut_ptr() as *mut c_char,
-            HOST_NAME_MAX as size_t,
-        )
+fn parse_rsyslog_log(
+    json_str: &str,
+    regex_confs: &Vec<RegexConf>,
+) -> Option<String> {
+    let v: Value = match serde_json::from_str(json_str) {
+        Ok(v) => v,
+        Err(e) => {
+            to_stderr!(
+                "Error: Failed to parse json string: {}, error: {}",
+                json_str,
+                e
+            );
+            return None;
+        }
+    };
+    let mut matched = false;
+    let mut event = Map::new();
+    let json_obj = match v.as_object() {
+        Some(m) => m,
+        None => {
+            to_stderr!("Error: JSON data is not a object : {}", json_str);
+            return None;
+        }
     };
 
-    if rc != 0 {
-        panic!("Failed to gethostname(): error {}", rc);
+    // Skip messages generated by peripetyd.
+    if json_obj.get("structured-data") != Some(&Value::String("-".to_string()))
+    {
+        return None;
     }
 
-    unsafe {
-        CStr::from_bytes_with_nul_unchecked(&buf)
-            .to_str()
-            .expect("Got invalid utf8 from gethostname()")
-            .trim_right_matches('\0')
-            .to_string()
+    // Skip non-kernel messages
+    if json_obj.get("syslogfacility") != Some(&Value::String("0".to_string())) {
+        return None;
     }
-}
 
-fn dump_blk_infos(notifier_send: &Sender<StorageEvent>) {
-    let blk_infos = BlkInfo::list().expect("Failed to query existing blocks");
-    for blk_info in blk_infos {
-        let msg = match blk_info.mount_point {
-            Some(ref mount_point) => format!(
-                "Found block '{}' mounted at '{}'",
-                &blk_info.blk_path, &mount_point
-            ),
-            None => format!("Found block '{}'", &blk_info.blk_path),
+    let msg = match json_obj.get("msg").and_then(|m| m.as_str()) {
+        Some(m) => m.to_string(),
+        None => {
+            to_stderr!("Error: JSON data is missing 'msg' data: {}", json_str);
+            return None;
+        }
+    };
+    let mut new_msg = msg.clone();
+    let msg = if msg.starts_with('[') {
+        if let Some(i) = msg.find(']') {
+            &msg[i + 2..]
+        } else {
+            &msg
+        }
+    } else {
+        &msg
+    };
+
+    for regex_conf in regex_confs {
+        // Save CPU from regex.captures() if starts_with() failed.
+        if let Some(ref s) = regex_conf.starts_with {
+            if !msg.starts_with(s) {
+                continue;
+            }
+        }
+
+        if let Some(cap) = regex_conf.regex.captures(&msg) {
+            if let Some(m) = cap.name("kdev") {
+                let kdev = m.as_str();
+                if let Ok(bi) = BlkInfo::new(kdev) {
+                    if let Ok(s) = bi.to_json_string() {
+                        matched = true;
+                        event.insert(
+                            "BLK_INFO_JSON".to_string(),
+                            Value::String(s),
+                        );
+                        if !bi.preferred_blk_path.is_empty() {
+                            event.insert(
+                                "BLK_PATH".to_string(),
+                                Value::String(bi.preferred_blk_path),
+                            );
+                        }
+                        if !bi.wwid.is_empty() {
+                            new_msg = format!("{} wwid: {}", new_msg, &bi.wwid);
+                            event.insert(
+                                "WWID".to_string(),
+                                Value::String(bi.wwid),
+                            );
+                        }
+                        if let Some(u) = bi.uuid {
+                            new_msg = format!("{} uuid: {}", new_msg, &u);
+                            event.insert("UUID".to_string(), Value::String(u));
+                        }
+                        if let Some(mp) = bi.mount_point {
+                            new_msg =
+                                format!("{} mount_point: {}", new_msg, &mp);
+                            event.insert(
+                                "MOUNT_POINT".to_string(),
+                                Value::String(mp),
+                            );
+                        }
+                        if !bi.transport_id.is_empty() {
+                            event.insert(
+                                "TRANSPORT_ID".to_string(),
+                                Value::String(bi.transport_id),
+                            );
+                        }
+                    } else {
+                        continue;
+                    }
+                } else {
+                    continue;
+                }
+            }
+
+            if regex_conf.sub_system != StorageSubSystem::Unknown {
+                event.insert(
+                    "SUB_SYSTEM".to_string(),
+                    Value::String(regex_conf.sub_system.to_string()),
+                );
+            }
+
+            if !regex_conf.event_type.is_empty() {
+                let event_type_str = regex_conf.event_type.to_string();
+                new_msg =
+                    format!("{} event_type: {}", new_msg, &event_type_str);
+                event.insert(
+                    "EVENT_TYPE".to_string(),
+                    Value::String(event_type_str),
+                );
+            }
+
+            // If regex has other named group, we save it to
+            // event.extension.
+            for name in regex_conf.regex.capture_names() {
+                if let Some(name) = name {
+                    if name == "kdev" {
+                        continue;
+                    }
+                    if let Some(v) = cap.name(name) {
+                        event.insert(
+                            name.to_string(),
+                            Value::String(v.as_str().to_string()),
+                        );
+                    }
+                }
+            }
+
+            break;
+        }
+    }
+    // Currently kernel does not provides sufficient structured data,
+    // Since we will do regex match anyway, there is no need to parse
+    // "SUBSYSTEM" and "DEVICE" entries for SCSI logs.
+    if matched {
+        let mut ret = Map::new();
+
+        ret.insert("msg".to_string(), Value::String(new_msg));
+        match serde_json::to_string(&event) {
+            Ok(s) => {
+                ret.insert("structured-data".to_string(), Value::String(s))
+            }
+            Err(e) => return Some(format!(r#"{{"error": "{}"}}"#, e)),
         };
-        let mut se: StorageEvent = Default::default();
-        se.hostname = gethostname();
-        se.severity = LogSeverity::Info;
-        se.sub_system = StorageSubSystem::Peripety;
-        se.timestamp =
-            Local::now().to_rfc3339_opts(SecondsFormat::Micros, false);
-        se.event_id = Uuid::new_v4().hyphenated().to_string();
-        se.event_type = "PERIPETY_BLK_INFO".to_string();
-        se.blk_info = blk_info;
-        se.msg = msg.clone();
-        se.raw_msg = msg;
 
-        notifier_send
-            .send(se)
-            .expect("Failed to send block information event");
+        match serde_json::to_string(&ret) {
+            Ok(s) => {
+                return Some(s);
+            }
+            Err(e) => return Some(format!(r#"{{"error": "{}"}}"#, e)),
+        };
     }
+    None
 }
