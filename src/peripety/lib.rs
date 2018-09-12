@@ -29,22 +29,25 @@
 extern crate serde;
 #[macro_use]
 extern crate serde_derive;
+extern crate chrono;
 extern crate libc;
 extern crate libmount;
 extern crate regex;
-extern crate serde_json;
 extern crate sdjournal;
-extern crate chrono;
+extern crate serde_json;
 
 pub use self::blk_info::{BlkInfo, BlkType};
 pub use self::error::PeripetyError;
-pub use self::event::{LogSeverity, StorageEvent, StorageSubSystem, StorageEventIter};
-pub use self::filter::{StorageEventFilter};
+pub use self::event::{
+    LogSeverity, StorageEvent, StorageEventIter,
+    StorageSubSystem,
+};
+pub use self::filter::{StorageEventFilter, StorageEventFilterType};
 
 mod blk_info;
 mod dm;
 mod error;
 mod event;
+mod filter;
 mod scsi;
 mod sysfs;
-mod filter;

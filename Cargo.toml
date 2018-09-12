@@ -4,4 +4,5 @@ members = [
     "src/sdjournal",
     "src/peripety",
     "src/prpt",
+    "src/peripety_c",
 ]

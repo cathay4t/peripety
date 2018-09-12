@@ -1,3 +1,6 @@
+ * cur_blk_info, hierarchy_blk_info.
+ * Support iscsi, multipath userspace tool logs.
+ * Support parsing sosreport log: ./sos_commands/logs/
  * Find a way to live in initramfs.
  * User case trigger file system event on block predict error.
  * Move `prpt` funtions to API.

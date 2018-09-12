@@ -327,10 +327,11 @@ fn dump_blk_infos(notifier_send: &Sender<StorageEvent>) {
     for blk_info in blk_infos {
         let msg = match blk_info.mount_point {
             Some(ref mount_point) => format!(
-                "Found block '{}' mounted at '{}'",
-                &blk_info.blk_path, &mount_point
+                "Found block '{}' '{}' mounted at '{}'",
+                &blk_info.blk_path, &blk_info.wwid, &mount_point
             ),
-            None => format!("Found block '{}'", &blk_info.blk_path),
+            None => format!("Found block '{}' '{}'", &blk_info.blk_path,
+                            &blk_info.wwid),
         };
         let mut se: StorageEvent = Default::default();
         se.hostname = gethostname();

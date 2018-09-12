@@ -73,7 +73,7 @@ fn flat_blk_info_owners(owners: Vec<BlkInfo>) -> Vec<BlkInfo> {
 }
 
 impl BlkInfo {
-    pub fn new(blk: &str) -> Result<BlkInfo, PeripetyError> {
+    pub fn new_hierarchy(blk: &str) -> Result<BlkInfo, PeripetyError> {
         let mut bi = BlkInfo::_new(blk, false)?;
         if bi.uuid.is_none() {
             if let Ok(uuid) = BlkInfo::uuid(&bi.blk_path) {
@@ -145,6 +145,7 @@ impl BlkInfo {
         Ok(ret)
     }
 
+    // Only check current block without hierarchy information.
     pub fn new_skip_extra(blk: &str) -> Result<BlkInfo, PeripetyError> {
         BlkInfo::_new(blk, true)
     }

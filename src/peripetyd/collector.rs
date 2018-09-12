@@ -1,3 +1,32 @@
+// Copyright (C) 2018 Red Hat, Inc.
+//
+// Permission is hereby granted, free of charge, to any
+// person obtaining a copy of this software and associated
+// documentation files (the "Software"), to deal in the
+// Software without restriction, including without
+// limitation the rights to use, copy, modify, merge,
+// publish, distribute, sublicense, and/or sell copies of
+// the Software, and to permit persons to whom the Software
+// is furnished to do so, subject to the following
+// conditions:
+//
+// The above copyright notice and this permission notice
+// shall be included in all copies or substantial portions
+// of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+// ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+// TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+// PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+// SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+// CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+// OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+// IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+// DEALINGS IN THE SOFTWARE.
+//
+// Author: Gris Ge <fge@redhat.com>
+
+//
 // Collector is supposed to get log from systemd journal and generate
 // event with kdev and sub system type.
 
@@ -8,7 +37,7 @@
 use chrono::{Local, SecondsFormat, TimeZone};
 use nix;
 use nix::sys::select::FdSet;
-use peripety::{LogSeverity, StorageEvent, StorageSubSystem};
+use peripety::{LogSeverity, StorageEvent, StorageSubSystem, BlkInfo};
 use sdjournal;
 use std::collections::HashMap;
 use std::os::unix::io::AsRawFd;
@@ -87,6 +116,20 @@ fn process_journal_entry(
             }
             if event.kdev.is_empty() {
                 continue;
+            }
+            match BlkInfo::new_hierarchy(&event.kdev) {
+                Ok(i) => event.hierarchy_blk_info = i,
+                Err(e) => {
+                    println!("collector: {}", e);
+                    return;
+                }
+            }
+            match BlkInfo::new_current(&event.kdev) {
+                Ok(i) => event.cur_blk_info = i,
+                Err(e) => {
+                    println!("collector: {}", e);
+                    return;
+                }
             }
 
             if regex_conf.sub_system != StorageSubSystem::Unknown {

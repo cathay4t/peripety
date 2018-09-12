@@ -1,0 +1,14 @@
+[package]
+name = "peripety_c"
+description = "Peripety C interface"
+version = "0.1.0"
+authors = ["Gris Ge <fge@redhat.com>"]
+
+[lib]
+name = "peripety"
+path = "lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+peripety = { path = "../peripety", version = "*"}
+libc = ">=0.2"

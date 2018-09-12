@@ -1,13 +1,41 @@
+// Copyright (C) 2018 Red Hat, Inc.
+//
+// Permission is hereby granted, free of charge, to any
+// person obtaining a copy of this software and associated
+// documentation files (the "Software"), to deal in the
+// Software without restriction, including without
+// limitation the rights to use, copy, modify, merge,
+// publish, distribute, sublicense, and/or sell copies of
+// the Software, and to permit persons to whom the Software
+// is furnished to do so, subject to the following
+// conditions:
+//
+// The above copyright notice and this permission notice
+// shall be included in all copies or substantial portions
+// of the Software.
+//
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF
+// ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED
+// TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A
+// PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT
+// SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+// CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION
+// OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR
+// IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+// DEALINGS IN THE SOFTWARE.
+//
+// Author: Gris Ge <fge@redhat.com>
+
 use super::blk_info::BlkInfo;
 use super::error::PeripetyError;
 use super::filter::{StorageEventFilter, StorageEventFilterType};
 
+use chrono::{Datelike, Duration, Local, TimeZone};
+use sdjournal::Journal;
 use serde_json;
 use std::collections::HashMap;
 use std::fmt;
 use std::str::{self, FromStr};
-use chrono::{Local, Datelike, TimeZone, Duration};
-use sdjournal::Journal;
 
 //TODO(Gris Ge): Add function StorageEvent::save_to_journal()
 
@@ -108,7 +136,8 @@ pub struct StorageEvent {
     pub timestamp: String,
     pub event_id: String,
     pub event_type: String,
-    pub blk_info: BlkInfo,
+    pub cur_blk_info: BlkInfo,
+    pub hierarchy_blk_info: BlkInfo,
     #[serde(skip_serializing, skip_deserializing)]
     pub kdev: String, // internal use-only: kernel device name.
     pub msg: String,
@@ -125,7 +154,8 @@ impl Default for StorageEvent {
             timestamp: String::new(),
             event_id: String::new(),
             event_type: String::new(),
-            blk_info: Default::default(),
+            cur_blk_info: Default::default(),
+            hierarchy_blk_info: Default::default(),
             kdev: String::new(),
             msg: String::new(),
             raw_msg: String::new(),
@@ -226,7 +256,7 @@ impl Iterator for StorageEventIter {
 }
 
 impl StorageEventIter {
-    fn new() -> Result<StorageEventIter, PeripetyError> {
+    pub fn new() -> Result<StorageEventIter, PeripetyError> {
         let mut journal = Journal::new()?;
         journal.timeout_us = 0;
         journal.add_match("IS_PERIPETY=TRUE")?;
@@ -236,7 +266,7 @@ impl StorageEventIter {
         })
     }
 
-    fn apply_filters(
+    pub fn apply_filters(
         &mut self,
         filters: &[StorageEventFilter],
     ) -> Result<(), PeripetyError> {
@@ -246,7 +276,7 @@ impl StorageEventIter {
         Ok(())
     }
 
-    fn apply_filter(
+    pub fn apply_filter(
         &mut self,
         filter: &StorageEventFilter,
     ) -> Result<(), PeripetyError> {
@@ -258,7 +288,7 @@ impl StorageEventIter {
         let value = &filter.value;
         match filter.filter_type {
             StorageEventFilterType::Wwid => {
-                self.extra_filters.push(StorageEventFilter{
+                self.extra_filters.push(StorageEventFilter {
                     filter_type: filter_type,
                     value: value.to_string(),
                 })
@@ -267,7 +297,7 @@ impl StorageEventIter {
                 self.journal.add_match(&format!("EVENT_TYPE={}", value))?
             }
             StorageEventFilterType::Severity => {
-                self.extra_filters.push(StorageEventFilter{
+                self.extra_filters.push(StorageEventFilter {
                     filter_type: filter_type,
                     value: value.to_string(),
                 })
@@ -275,7 +305,8 @@ impl StorageEventIter {
             StorageEventFilterType::SubSystem => {
                 self.journal.add_match(&format!("SUB_SYSTEM={}", value))?
             }
-            StorageEventFilterType::Since => self.journal
+            StorageEventFilterType::Since => self
+                .journal
                 .seek_realtime_usec(since_str_to_jourald_timestamp(&value)?)?,
             StorageEventFilterType::EventId => {
                 self.journal.add_match(&format!("EVENT_ID={}", value))?
