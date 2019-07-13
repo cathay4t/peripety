@@ -8,4 +8,4 @@ name = "sdjournal"
 path = "lib.rs"
 
 [dependencies]
-libc = ">=0.2"
+libc = "0.2"

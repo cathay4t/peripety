@@ -8,13 +8,13 @@ name = "peripetyd"
 path = "main.rs"
 
 [dependencies]
-peripety = { path = "../peripety", version = "*"}
-sdjournal = { path = "../sdjournal", version = "*"}
-nix = ">=0.10"
-regex = ">=0.2"
-serde = ">=1.0"
-serde_derive = ">=1.0"
-toml = ">=0.4"
-chrono = ">=0.4"
-libc = ">=0.2"
-uuid = { version = ">=0.6", features = ["v4"]}
+peripety = { path = "../peripety" }
+sdjournal = { path = "../sdjournal" }
+nix = "0.14"
+regex = "1"
+serde = "1"
+serde_derive = "1"
+toml = "0.5"
+chrono = "0.4"
+libc = "0.2"
+uuid = { version = "0.7", features = ["v4"]}

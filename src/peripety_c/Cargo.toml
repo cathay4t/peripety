@@ -10,5 +10,5 @@ path = "lib.rs"
 crate-type = ["cdylib"]
 
 [dependencies]
-peripety = { path = "../peripety", version = "*"}
-libc = ">=0.2"
+peripety = { path = "../peripety" }
+libc = "0.2"
